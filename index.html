@@ -1,0 +1,1252 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#ffffff">
+<title>🧠 Мозговые головоломки</title>
+<style>
+  :root{ --ink:#26313f; --yellow:#ffd23b; --green:#3ecf5e; --red:#ff5252; --blue:#3b9bff; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; overflow:hidden; }
+  body{ font-family:-apple-system,'SF Pro Rounded','Segoe UI',system-ui,sans-serif; background:#fff; color:var(--ink); user-select:none; -webkit-user-select:none; }
+  #err{ position:fixed; left:8px; right:8px; bottom:8px; z-index:9999; background:#b00020; color:#fff; font:12px/1.4 monospace; padding:8px 10px; border-radius:10px; display:none; white-space:pre-wrap; }
+  button{ font-family:inherit; }
+
+  /* ---------- общие кнопки ---------- */
+  .big{ display:block; width:min(340px,80vw); margin:10px auto; padding:16px 20px; font-size:22px; font-weight:800; color:#fff; background:linear-gradient(180deg,#4fb2ff,#2f7fe0); border:none; border-radius:18px; box-shadow:0 6px 0 #1d5ba8; cursor:pointer; }
+  .big:active{ transform:translateY(4px); box-shadow:0 2px 0 #1d5ba8; }
+  .big.gold{ background:linear-gradient(180deg,#ffd856,#f5a623); box-shadow:0 6px 0 #b4771a; }
+  .big.gold:active{ box-shadow:0 2px 0 #b4771a; }
+  .chip{ display:inline-flex; align-items:center; gap:6px; padding:8px 14px; background:#fff; border:3px solid #e7ecf3; border-radius:999px; font-weight:800; font-size:18px; box-shadow:0 3px 0 #e0e6ee; cursor:pointer; }
+  .chip:active{ transform:translateY(2px); box-shadow:none; }
+
+  /* ---------- меню ---------- */
+  .screen{ position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; background:#fff; z-index:10; }
+  .screen.show{ display:flex; }
+  #menu h1{ font-size:min(9vw,44px); margin:12px 0 2px; text-align:center; }
+  #menu .sub{ color:#8b97a6; font-weight:700; margin-bottom:14px; }
+  #menuLogo{ width:min(44vw,200px); height:auto; }
+  #menuStats{ position:fixed; top:12px; right:12px; display:flex; gap:8px; }
+
+  /* ---------- выбор уровня ---------- */
+  #levels{ justify-content:flex-start; padding-top:64px; }
+  #levelsGrid{ display:grid; grid-template-columns:repeat(auto-fill,64px); gap:10px; justify-content:center; width:min(92vw,640px); max-height:76vh; overflow-y:auto; padding:6px; }
+  .lvBtn{ width:64px; height:64px; border-radius:16px; border:none; font-size:19px; font-weight:900; color:#fff; cursor:pointer; }
+  .lvBtn.done{ background:linear-gradient(180deg,#57de77,#2fae52); box-shadow:0 4px 0 #1f7c38; }
+  .lvBtn.next{ background:linear-gradient(180deg,#ffd856,#f5a623); box-shadow:0 4px 0 #b4771a; animation:pulse 1.2s infinite; }
+  .lvBtn.lock{ background:#cfd6df; box-shadow:0 4px 0 #aeb7c2; cursor:default; }
+  @keyframes pulse{ 0%,100%{ transform:scale(1);} 50%{ transform:scale(1.07);} }
+  .backChip{ position:fixed; top:12px; left:12px; }
+
+  /* ---------- игровой экран ---------- */
+  #game{ display:none; position:fixed; inset:0; background:#fff; }
+  #game.show{ display:block; }
+  #hud{ position:fixed; top:0; left:0; right:0; display:flex; align-items:center; justify-content:space-between; padding:10px 12px; z-index:20; pointer-events:none; }
+  #hud > *{ pointer-events:auto; }
+  #bulbBox{ display:flex; flex-direction:column; align-items:center; gap:2px; }
+  #statusBulbs{ display:flex; gap:14px; align-items:center; background:#fff; border:3px solid #e7ecf3; border-radius:999px; padding:6px 18px; box-shadow:0 3px 0 #e0e6ee; }
+  .sbulb{ width:26px; height:26px; border-radius:50%; border:3px solid #b9c2cd; background:#eef1f5; transition:all .25s; }
+  .sbulb.red.on{ background:var(--red); border-color:#c22; box-shadow:0 0 18px 4px rgba(255,60,60,.75); }
+  .sbulb.green.on{ background:var(--green); border-color:#1d8f3d; box-shadow:0 0 18px 4px rgba(50,220,90,.75); }
+  #lvLabel{ font-weight:900; font-size:15px; color:#8b97a6; margin-top:3px; }
+  #task{ position:fixed; top:88px; left:0; right:0; text-align:center; font-size:min(4.6vw,21px); font-weight:900; padding:0 14px; z-index:15; pointer-events:none; }
+  #scene{ position:absolute; top:130px; left:6px; right:76px; bottom:6px; display:flex; align-items:center; justify-content:center; }
+  #scene svg{ width:100%; height:100%; touch-action:none; display:block; }
+  #dock{ position:fixed; right:10px; bottom:10px; display:flex; flex-direction:column; gap:10px; z-index:25; }
+  .dockBtn{ width:58px; height:58px; border-radius:18px; border:none; font-size:26px; cursor:pointer; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1; }
+  .dockBtn small{ font-size:9px; font-weight:900; margin-top:2px; }
+  .dockBtn.shop{ background:linear-gradient(180deg,#ff9e57,#f06e21); box-shadow:0 4px 0 #b34a0e; }
+  .dockBtn.list{ background:linear-gradient(180deg,#b98bff,#8a54e8); box-shadow:0 4px 0 #5c33a6; }
+  .dockBtn.home{ background:linear-gradient(180deg,#4fb2ff,#2f7fe0); box-shadow:0 4px 0 #1d5ba8; }
+  .dockBtn.snd{ background:linear-gradient(180deg,#8fa4b8,#64798e); box-shadow:0 4px 0 #47586a; }
+  .dockBtn:active{ transform:translateY(3px); box-shadow:none !important; }
+
+  /* ---------- оверлеи ---------- */
+  .overlay{ position:fixed; inset:0; background:rgba(12,16,26,.88); z-index:40; display:none; align-items:center; justify-content:center; }
+  .overlay.show{ display:flex; }
+  .card{ width:min(88vw,420px); background:#1b2333; border-radius:24px; padding:26px 22px; text-align:center; color:#fff; box-shadow:0 18px 60px rgba(0,0,0,.5); }
+  .card .bigEmoji{ font-size:64px; line-height:1; filter:drop-shadow(0 0 22px rgba(255,220,80,.5)); }
+  .card h2{ margin:10px 0 6px; font-size:26px; }
+  .card .phrase{ font-size:19px; font-weight:700; color:#dfe7f5; min-height:52px; }
+  .card .reward{ font-size:22px; font-weight:900; color:var(--yellow); margin:8px 0; }
+  .shopRow{ display:flex; align-items:center; justify-content:space-between; gap:10px; background:#242f45; border-radius:16px; padding:12px 14px; margin:10px 0; font-weight:800; font-size:17px; color:#fff; }
+  .shopRow button{ padding:10px 16px; font-size:16px; font-weight:900; color:#3a2400; background:linear-gradient(180deg,#ffd856,#f5a623); border:none; border-radius:12px; box-shadow:0 4px 0 #b4771a; cursor:pointer; }
+  .shopRow button:disabled{ filter:grayscale(1); opacity:.6; }
+  .shopRow button:active{ transform:translateY(3px); box-shadow:none; }
+  #toast{ position:fixed; left:50%; bottom:84px; transform:translateX(-50%); background:#1b2333; color:#fff; font-weight:800; padding:12px 20px; border-radius:999px; z-index:60; display:none; box-shadow:0 8px 30px rgba(0,0,0,.35); max-width:86vw; text-align:center; }
+  .xClose{ position:absolute; top:10px; right:12px; background:none; border:none; color:#8b97a6; font-size:26px; cursor:pointer; }
+  .cardWrap{ position:relative; }
+</style>
+</head>
+<body>
+<div id="err"></div>
+
+<!-- ======== МЕНЮ ======== -->
+<div id="menu" class="screen show">
+  <div id="menuStats">
+    <span class="chip">💡 <span id="mBulbs">0</span></span>
+    <span class="chip">🪙 <span id="mCoins">0</span></span>
+  </div>
+  <svg id="menuLogo" viewBox="0 0 200 200">
+    <g id="logoQ" font-size="26" font-weight="900" fill="#b9c2cd"></g>
+    <g transform="translate(100,96)">
+      <circle r="46" fill="#ffd23b" stroke="#e8a800" stroke-width="5"/>
+      <path d="M-14,38 h28 v10 a8 8 0 0 1 -8 8 h-12 a8 8 0 0 1 -8 -8 z" fill="#9aa7b5" stroke="#7c8896" stroke-width="3"/>
+      <path d="M-12,10 q12,-14 0,-26 M12,10 q-12,-14 0,-26" stroke="#e8a800" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <g stroke="#ffd23b" stroke-width="6" stroke-linecap="round">
+        <line x1="0" y1="-62" x2="0" y2="-78"/><line x1="44" y1="-44" x2="55" y2="-55"/><line x1="-44" y1="-44" x2="-55" y2="-55"/>
+        <line x1="62" y1="0" x2="78" y2="0"/><line x1="-62" y1="0" x2="-78" y2="0"/>
+      </g>
+    </g>
+  </svg>
+  <h1>Мозговые головоломки</h1>
+  <div class="sub">100 хитрых загадок с подвохом 🕵️</div>
+  <button class="big gold" id="playBtn">▶ ИГРАТЬ</button>
+  <button class="big" id="pickBtn">📋 Выбрать уровень</button>
+</div>
+
+<!-- ======== ВЫБОР УРОВНЯ ======== -->
+<div id="levels" class="screen">
+  <button class="chip backChip" id="lvBack">◀ Меню</button>
+  <h2 style="margin:6px 0 12px">Выбери уровень</h2>
+  <div id="levelsGrid"></div>
+</div>
+
+<!-- ======== ИГРА ======== -->
+<div id="game">
+  <div id="scene"></div>
+  <div id="hud">
+    <span class="chip" id="hintBtn">💡 <span id="gBulbs">0</span></span>
+    <div id="bulbBox">
+      <div id="statusBulbs"><div class="sbulb red" id="redBulb"></div><div class="sbulb green" id="greenBulb"></div></div>
+      <div id="lvLabel">Уровень 1</div>
+    </div>
+    <span class="chip">🪙 <span id="gCoins">0</span></span>
+  </div>
+  <div id="task"></div>
+  <div id="dock">
+    <button class="dockBtn shop" id="shopBtn">🛒<small>МАГАЗИН</small></button>
+    <button class="dockBtn list" id="listBtn">📋<small>УРОВНИ</small></button>
+    <button class="dockBtn home" id="homeBtn">🏠<small>МЕНЮ</small></button>
+    <button class="dockBtn snd" id="sndBtn">🔊<small>ЗВУК</small></button>
+  </div>
+</div>
+
+<!-- ======== ИТОГ УРОВНЯ ======== -->
+<div id="result" class="overlay">
+  <div class="card">
+    <div class="bigEmoji" id="resEmoji">💡</div>
+    <h2 id="resTitle">Правильно!</h2>
+    <div class="phrase" id="resPhrase"></div>
+    <div class="reward" id="resReward"></div>
+    <button class="big gold" id="resNext" style="width:100%">Дальше ▶</button>
+    <button class="big" id="resRetry" style="width:100%">Ещё раз 🔁</button>
+  </div>
+</div>
+
+<!-- ======== МАГАЗИН ======== -->
+<div id="shop" class="overlay">
+  <div class="card cardWrap">
+    <button class="xClose" id="shopClose">✕</button>
+    <div class="bigEmoji">🛒</div>
+    <h2>Магазин</h2>
+    <div style="font-weight:800;color:#9fb0c8">У тебя: 🪙 <span id="sCoins">0</span> · 💡 <span id="sBulbs">0</span></div>
+    <div class="shopRow"><span>💡 1 подсказка</span><button id="buy1">30 🪙</button></div>
+    <div class="shopRow"><span>💡×3 подсказки</span><button id="buy3">75 🪙</button></div>
+    <div class="shopRow"><span>🎁 Подарок дня</span><button id="giftBtn">+10 🪙</button></div>
+  </div>
+</div>
+
+<!-- ======== ПОДСКАЗКА ======== -->
+<div id="hintPop" class="overlay">
+  <div class="card cardWrap">
+    <button class="xClose" id="hintClose">✕</button>
+    <div class="bigEmoji">💡</div>
+    <h2>Подсказка</h2>
+    <div class="phrase" id="hintText"></div>
+    <button class="big gold" id="hintUse" style="width:100%">Показать за 1 💡</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+// ======== ошибки на экран (Марк не видит консоль) ========
+window.onerror = function (m, s, l, c) { const e = document.getElementById('err'); e.style.display = 'block'; e.textContent = '⚠️ ' + m + ' (стр. ' + l + ':' + c + ')'; };
+
+// ======== сохранение ========
+const SAVE_KEY = 'brainPuzzles_v1';
+let S = { coins: 0, bulbs: 1, passed: {}, lastGift: '', sound: true };
+try { Object.assign(S, JSON.parse(localStorage.getItem(SAVE_KEY) || '{}')); } catch (e) {}
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
+
+// ======== утилиты ========
+const el = id => document.getElementById(id);
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function shuffle(arr, rnd) { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+let toastT = null;
+function toast(msg) { const t = el('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toastT); toastT = setTimeout(() => t.style.display = 'none', 2200); }
+const NS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs, parent) { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; }
+function svgPt(svg, ev) { const p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); }
+
+// ======== звук: детективная музыка + эффекты ========
+let actx = null, musicOn = false, musicTimer = null;
+function initAudio() { if (actx) return; try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } }
+function blip(freq, dur, type, vol, when) {
+  if (!actx || !S.sound) return; const t = when || actx.currentTime;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type || 'sine'; o.frequency.value = freq; g.gain.value = 0.0001;
+  o.connect(g); g.connect(actx.destination);
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol || 0.15, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + (dur || 0.2));
+  o.start(t); o.stop(t + (dur || 0.2) + 0.05);
+}
+function sndClick() { blip(700, 0.06, 'triangle', 0.08); }
+function sndCoin() { blip(880, 0.1, 'sine', 0.12); blip(1320, 0.18, 'sine', 0.12, actx ? actx.currentTime + 0.08 : 0); }
+function sndWin() { if (!actx || !S.sound) return; const t = actx.currentTime; [523, 659, 784, 1047].forEach((f, i) => blip(f, 0.22, 'triangle', 0.16, t + i * 0.12)); }
+function sndFail() { if (!actx || !S.sound) return; const t = actx.currentTime; blip(300, 0.25, 'sawtooth', 0.08, t); blip(230, 0.35, 'sawtooth', 0.08, t + 0.22); }
+// крадущийся детективный бас + щёточки
+const BASS_SEQ = [110, 0, 130.8, 110, 146.8, 0, 130.8, 110, 110, 0, 130.8, 146.8, 164.8, 0, 146.8, 130.8];
+let seqStep = 0, nextNote = 0;
+function scheduleMusic() {
+  if (!actx || !S.sound || !musicOn) return;
+  const ahead = actx.currentTime + 0.15;
+  while (nextNote < ahead) {
+    const f = BASS_SEQ[seqStep % BASS_SEQ.length];
+    if (f) { const o = actx.createOscillator(), g = actx.createGain(); o.type = 'triangle'; o.frequency.value = f; o.connect(g); g.connect(actx.destination); g.gain.setValueAtTime(0.0001, nextNote); g.gain.linearRampToValueAtTime(0.07, nextNote + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, nextNote + 0.26); o.start(nextNote); o.stop(nextNote + 0.3); }
+    if (seqStep % 2 === 1) { const b = actx.createBuffer(1, 1200, actx.sampleRate); const d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length); const src = actx.createBufferSource(); src.buffer = b; const g = actx.createGain(); g.gain.value = 0.018; const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 6000; src.connect(hp); hp.connect(g); g.connect(actx.destination); src.start(nextNote); }
+    if (seqStep % 32 === 24) blip(587, 1.1, 'sine', 0.03, nextNote); // загадочная нотка
+    seqStep++; nextNote += 0.24;
+  }
+}
+function startMusic() { initAudio(); if (!actx) return; musicOn = true; nextNote = Math.max(nextNote, actx.currentTime + 0.05); if (!musicTimer) musicTimer = setInterval(scheduleMusic, 60); }
+function stopMusic() { musicOn = false; }
+
+// ======== фразы поддержки ========
+const WIN_PHRASES = [
+  'Отлично! Ты молодец! Это было непросто, но не для тебя!',
+  'Гений! Чистая работа! 🧠',
+  'Вот это мозги! Так держать!',
+  'Невероятно! Ты щёлкаешь загадки как орешки!',
+  'Браво! Даже я бы так быстро не догадался!',
+  'Супер! Ни одна загадка перед тобой не устоит!',
+  'Ты настоящий детектив! 🕵️',
+  'Блестяще! Лампочка гордится тобой!',
+  'Ура! Ещё одна тайна раскрыта!',
+  'Мощно! Твой мозг сегодня в ударе!',
+  'Точно в цель! Ты умнее, чем задачка!',
+  'Ого! Это было хитро, но ты хитрее!',
+  'Победа! Загадки дрожат от страха!',
+  'Красота! Решено как по нотам!',
+  'Ты просто чемпион по загадкам!',
+  'Вот это скорость мысли! Молния! ⚡',
+];
+const FAIL_PHRASES = [
+  'Не переживай, попробуй ещё раз!',
+  'Почти получилось! Ещё чуть-чуть!',
+  'Хитрый уровень… но ты хитрее — попробуй снова!',
+  'Ошибаться — это нормально. Вперёд, ещё разок!',
+  'Даже великие сыщики иногда ошибаются!',
+  'Ничего страшного! Ты уже ближе к разгадке!',
+  'Ой! Ну ничего, ты точно справишься!',
+  'Это была тренировка. Теперь — по-настоящему!',
+  'Не сдавайся! Загадка уже почти сдалась!',
+  'Подвох оказался хитрым. Но ты его раскусишь!',
+  'Спокойно! Настоящий детектив не сдаётся!',
+  'Попробуй посмотреть на задачку по-другому 😉',
+];
+let lastWinIdx = -1, lastFailIdx = -1;
+function pick(arr, lastIdx) { let i; do { i = Math.floor(Math.random() * arr.length); } while (i === lastIdx && arr.length > 1); return i; }
+
+// ======== экраны ========
+function showScreen(id) { ['menu', 'levels'].forEach(s => el(s).classList.toggle('show', s === id)); el('game').classList.toggle('show', id === 'game'); }
+function refreshHud() { el('mCoins').textContent = S.coins; el('mBulbs').textContent = S.bulbs; el('gCoins').textContent = S.coins; el('gBulbs').textContent = S.bulbs; el('sCoins').textContent = S.coins; el('sBulbs').textContent = S.bulbs; }
+function firstUnpassed() { for (let i = 0; i < LEVELS.length; i++) if (!S.passed[i]) return i; return LEVELS.length - 1; }
+function renderLevels() {
+  const g = el('levelsGrid'); g.innerHTML = '';
+  const next = firstUnpassed();
+  LEVELS.forEach((lv, i) => {
+    const b = document.createElement('button'); b.className = 'lvBtn ' + (S.passed[i] ? 'done' : (i <= next ? 'next' : 'lock'));
+    b.textContent = S.passed[i] ? '✅' : (i <= next ? (i + 1) : '🔒');
+    if (S.passed[i]) b.textContent = (i + 1);
+    if (S.passed[i] || i <= next) b.onclick = () => { sndClick(); startLevel(i); };
+    g.appendChild(b);
+  });
+}
+
+// ======== движок уровня ========
+let cur = 0, levelApi = null, failLock = false, cleanupFns = [];
+function setBulb(color) { el('redBulb').classList.toggle('on', color === 'red'); el('greenBulb').classList.toggle('on', color === 'green'); }
+function startLevel(i) {
+  cur = i; failLock = false;
+  cleanupFns.forEach(f => f()); cleanupFns = [];
+  showScreen('game'); startMusic();
+  setBulb(null);
+  el('lvLabel').textContent = 'Уровень ' + (i + 1);
+  refreshHud();
+  const lv = LEVELS[i];
+  el('task').textContent = lv.task || '';
+  const scene = el('scene'); scene.innerHTML = '';
+  const svg = svgEl('svg', { viewBox: '0 0 800 560', preserveAspectRatio: 'xMidYMid meet' }, null);
+  scene.appendChild(svg);
+  const rng = mulberry32(lv.seed || (i * 1000 + 7));
+  levelApi = {
+    svg, rng, level: lv,
+    on(target, ev, fn, opts) { target.addEventListener(ev, fn, opts); cleanupFns.push(() => target.removeEventListener(ev, fn, opts)); },
+    win() { if (failLock) return; failLock = true; onWin(); },
+    fail() { if (failLock) return; failLock = true; onFail(); },
+  };
+  TYPES[lv.t].build(svg, lv.p || {}, levelApi);
+}
+function onWin() {
+  setBulb('green'); sndWin();
+  const first = !S.passed[cur];
+  if (first) { S.passed[cur] = true; S.coins += 10; save(); setTimeout(sndCoin, 500); }
+  refreshHud();
+  setTimeout(() => {
+    lastWinIdx = pick(WIN_PHRASES, lastWinIdx);
+    el('resEmoji').textContent = '🟢';
+    el('resTitle').textContent = 'ПРАВИЛЬНО!';
+    el('resPhrase').textContent = WIN_PHRASES[lastWinIdx];
+    el('resReward').textContent = first ? '+10 🪙' : 'Уровень уже пройден — монетки не повторяются 😉';
+    el('resNext').style.display = 'block'; el('resRetry').style.display = 'none';
+    el('result').classList.add('show');
+  }, 900);
+}
+function onFail() {
+  setBulb('red'); sndFail();
+  setTimeout(() => {
+    lastFailIdx = pick(FAIL_PHRASES, lastFailIdx);
+    el('resEmoji').textContent = '🔴';
+    el('resTitle').textContent = 'Не совсем…';
+    el('resPhrase').textContent = FAIL_PHRASES[lastFailIdx];
+    el('resReward').textContent = '';
+    el('resNext').style.display = 'none'; el('resRetry').style.display = 'block';
+    el('result').classList.add('show');
+  }, 900);
+}
+el('resNext').onclick = () => { sndClick(); el('result').classList.remove('show'); if (cur + 1 < LEVELS.length) startLevel(cur + 1); else { toast('🏆 Ты прошёл ВСЕ уровни! Скоро добавим новые!'); showScreen('menu'); } };
+el('resRetry').onclick = () => { sndClick(); el('result').classList.remove('show'); startLevel(cur); };
+
+// ======== подсказки ========
+el('hintBtn').onclick = () => { sndClick(); el('hintText').textContent = '❓ Хочешь подсказку к этому уровню?'; el('hintUse').style.display = S.bulbs > 0 ? 'block' : 'none'; if (S.bulbs <= 0) el('hintText').textContent = 'У тебя нет лампочек 💡 — загляни в магазин 🛒!'; el('hintPop').classList.add('show'); };
+el('hintUse').onclick = () => { if (S.bulbs <= 0) return; S.bulbs--; save(); refreshHud(); sndClick(); el('hintText').textContent = '💡 ' + (LEVELS[cur].hint || 'Смотри внимательнее — подвох рядом!'); el('hintUse').style.display = 'none'; };
+el('hintClose').onclick = () => { sndClick(); el('hintPop').classList.remove('show'); };
+
+// ======== магазин ========
+el('shopBtn').onclick = () => { sndClick(); refreshHud(); refreshGift(); el('shop').classList.add('show'); };
+el('shopClose').onclick = () => { sndClick(); el('shop').classList.remove('show'); };
+el('buy1').onclick = () => { if (S.coins < 30) return toast('Не хватает монеток 🪙 — проходи уровни!'); S.coins -= 30; S.bulbs += 1; save(); refreshHud(); sndCoin(); toast('💡 +1 подсказка!'); };
+el('buy3').onclick = () => { if (S.coins < 75) return toast('Не хватает монеток 🪙 — проходи уровни!'); S.coins -= 75; S.bulbs += 3; save(); refreshHud(); sndCoin(); toast('💡 +3 подсказки!'); };
+function todayStr() { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+function refreshGift() { el('giftBtn').disabled = (S.lastGift === todayStr()); el('giftBtn').textContent = S.lastGift === todayStr() ? 'завтра!' : '+10 🪙'; }
+el('giftBtn').onclick = () => { if (S.lastGift === todayStr()) return; S.lastGift = todayStr(); S.coins += 10; save(); refreshHud(); refreshGift(); sndCoin(); toast('🎁 Подарок дня: +10 🪙'); };
+
+// ======== кнопки ========
+el('playBtn').onclick = () => { initAudio(); sndClick(); startLevel(firstUnpassed()); };
+el('pickBtn').onclick = () => { initAudio(); sndClick(); renderLevels(); showScreen('levels'); };
+el('lvBack').onclick = () => { sndClick(); showScreen('menu'); refreshHud(); };
+el('listBtn').onclick = () => { sndClick(); renderLevels(); showScreen('levels'); };
+el('homeBtn').onclick = () => { sndClick(); stopMusic(); showScreen('menu'); refreshHud(); };
+el('sndBtn').onclick = () => { S.sound = !S.sound; save(); el('sndBtn').firstChild.textContent = S.sound ? '🔊' : '🔇'; if (S.sound) startMusic(); };
+
+// знаки вопроса вокруг лампочки в меню
+(() => { const g = el('logoQ'); const R = 88; for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 - Math.PI / 2; const t = document.createElementNS(NS, 'text'); t.setAttribute('x', 100 + Math.cos(a) * R); t.setAttribute('y', 100 + Math.sin(a) * R + 8); t.setAttribute('text-anchor', 'middle'); t.textContent = '?'; t.setAttribute('transform', 'rotate(' + (a * 180 / Math.PI + 90) + ' ' + (100 + Math.cos(a) * R) + ' ' + (100 + Math.sin(a) * R) + ')'); g.appendChild(t); } })();
+
+// ==========================================================================
+//  ТИПЫ ГОЛОВОЛОМОК
+// ==========================================================================
+const TYPES = {};
+const WIRE_COLORS = ['#ff5252', '#3b9bff', '#3ecf5e', '#ffb300', '#b455ff', '#00c9c9', '#ff6ec7', '#8d6e63'];
+
+// ---------- 🔌 ПРОВОДА ----------
+TYPES.wires = { build(svg, p, api) {
+  const n = p.n || 3, rng = api.rng;
+  const H = 560, top = 130, bot = H - 60;
+  const ys = []; for (let i = 0; i < n; i++) ys.push(top + (bot - top) * (n === 1 ? 0.5 : i / (n - 1)));
+  // решение: розетка i на той же «высотной позиции», что вилка i (порядок сохранён → не пересекается)
+  // плюс обманки: лишние розетки тех же цветов в перепутанных местах
+  const colors = shuffle(WIRE_COLORS.slice(0, n), rng);
+  const plugY = ys.slice();
+  const sockSlots = shuffle(ys.slice(), rng); // визуально розетки стоят в другом порядке по вертикали? нет:
+  //正解-розетки в том же порядке, обманки — со сдвигом
+  const sockets = [];
+  for (let i = 0; i < n; i++) sockets.push({ y: ys[i], color: colors[i], ok: true });
+  const extra = Math.min(p.extra == null ? Math.max(1, n - 2) : p.extra, n);
+  const used = new Set();
+  for (let k = 0; k < extra; k++) {
+    let i; do { i = Math.floor(rng() * n); } while (used.has(i)); used.add(i);
+    let j; do { j = Math.floor(rng() * n); } while (Math.abs(j - i) < 1);
+    sockets.push({ y: ys[j] + (rng() - 0.5) * 26, color: colors[i], ok: false });
+  }
+  shuffle(sockets, rng);
+  const wiresG = svgEl('g', {}, svg), plugsG = svgEl('g', {}, svg), socksG = svgEl('g', {}, svg);
+  const conns = new Map(); // plugIdx -> socket obj
+  const sockTaken = new Set();
+  const plugs = [];
+  for (let i = 0; i < n; i++) {
+    const g = svgEl('g', { transform: 'translate(70,' + plugY[i] + ')', cursor: 'pointer' }, plugsG);
+    svgEl('rect', { x: -46, y: -16, width: 52, height: 32, rx: 8, fill: colors[i], stroke: '#26313f', 'stroke-width': 3 }, g);
+    svgEl('rect', { x: 6, y: -7, width: 16, height: 4, rx: 2, fill: '#c9a44a' }, g);
+    svgEl('rect', { x: 6, y: 3, width: 16, height: 4, rx: 2, fill: '#c9a44a' }, g);
+    plugs.push({ x: 92, y: plugY[i], color: colors[i], g });
+  }
+  sockets.forEach(sk => {
+    const g = svgEl('g', { transform: 'translate(724,' + sk.y + ')' }, socksG);
+    svgEl('rect', { x: -14, y: -20, width: 44, height: 40, rx: 10, fill: '#f2f5f9', stroke: sk.color, 'stroke-width': 5 }, g);
+    svgEl('circle', { cx: 8, cy: -7, r: 3.4, fill: '#26313f' }, g);
+    svgEl('circle', { cx: 8, cy: 7, r: 3.4, fill: '#26313f' }, g);
+    sk.gx = 710; sk.gy = sk.y; sk.g = g;
+  });
+  let drag = null, tempLine = null;
+  function lineFor(i, x2, y2) { return 'M' + plugs[i].x + ',' + plugs[i].y + ' L' + x2 + ',' + y2; }
+  function redraw() {
+    wiresG.innerHTML = '';
+    conns.forEach((sk, i) => svgEl('path', { d: lineFor(i, sk.gx, sk.gy), stroke: plugs[i].color, 'stroke-width': 8, fill: 'none', 'stroke-linecap': 'round' }, wiresG));
+    if (drag != null && tempLine) wiresG.appendChild(tempLine);
+  }
+  function segsCross(a1, a2, b1, b2) {
+    const d = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+    const s1 = d(a1, a2, b1), s2 = d(a1, a2, b2), s3 = d(b1, b2, a1), s4 = d(b1, b2, a2);
+    return ((s1 > 0) !== (s2 > 0)) && ((s3 > 0) !== (s4 > 0));
+  }
+  function checkDone() {
+    if (conns.size < n) return;
+    const segs = [...conns.entries()].map(([i, sk]) => [{ x: plugs[i].x, y: plugs[i].y }, { x: sk.gx, y: sk.gy }]);
+    for (let i = 0; i < segs.length; i++) for (let j = i + 1; j < segs.length; j++)
+      if (segsCross(segs[i][0], segs[i][1], segs[j][0], segs[j][1])) return api.fail();
+    api.win();
+  }
+  svg.addEventListener('pointerdown', ev => {
+    const pt = svgPt(svg, ev);
+    for (let i = 0; i < n; i++) if (Math.hypot(pt.x - plugs[i].x + 20, pt.y - plugs[i].y) < 46) {
+      if (conns.has(i)) { sockTaken.delete(conns.get(i)); conns.delete(i); }
+      drag = i; tempLine = svgEl('path', { d: lineFor(i, pt.x, pt.y), stroke: plugs[i].color, 'stroke-width': 8, fill: 'none', 'stroke-linecap': 'round', opacity: 0.75 }, null);
+      redraw(); sndClick(); ev.preventDefault(); return;
+    }
+  });
+  api.on(window, 'pointermove', ev => { if (drag == null) return; const pt = svgPt(svg, ev); tempLine.setAttribute('d', lineFor(drag, pt.x, pt.y)); });
+  api.on(window, 'pointerup', ev => {
+    if (drag == null) return; const pt = svgPt(svg, ev);
+    let hit = null;
+    for (const sk of sockets) if (!sockTaken.has(sk) && sk.color === plugs[drag].color && Math.hypot(pt.x - sk.gx - 8, pt.y - sk.gy) < 42) { hit = sk; break; }
+    if (hit) { conns.set(drag, hit); sockTaken.add(hit); sndClick(); }
+    drag = null; tempLine = null; redraw();
+    checkDone();
+  });
+  redraw();
+} };
+
+// ---------- 📺 ВКЛЮЧИ ТЕЛЕВИЗОР ----------
+TYPES.tvroom = { build(svg, p, api) {
+  const n = p.n || 6, rng = api.rng;
+  // комната
+  svgEl('rect', { x: 0, y: 0, width: 800, height: 360, fill: '#e9f1fa' }, svg);
+  svgEl('rect', { x: 0, y: 360, width: 800, height: 200, fill: '#d8b98a' }, svg);
+  // телевизор
+  const tv = svgEl('g', { transform: 'translate(400,150)' }, svg);
+  svgEl('rect', { x: -120, y: -75, width: 240, height: 150, rx: 12, fill: '#26313f' }, tv);
+  const tvScr = svgEl('rect', { x: -108, y: -63, width: 216, height: 126, rx: 6, fill: '#0b0f16' }, tv);
+  svgEl('rect', { x: -30, y: 75, width: 60, height: 14, fill: '#3d4b5d' }, tv);
+  svgEl('rect', { x: -70, y: 89, width: 140, height: 10, rx: 5, fill: '#3d4b5d' }, tv);
+  // тумбочки
+  const cols = Math.ceil(n / 2), positions = [];
+  for (let i = 0; i < n; i++) { const r = Math.floor(i / cols), c = i % cols; positions.push({ x: 110 + c * (600 / Math.max(1, cols - 1) || 0), y: 392 + r * 84 }); }
+  const remoteIdx = Math.floor(rng() * n);
+  let fakeIdx = -1;
+  if (p.fake) { do { fakeIdx = Math.floor(rng() * n); } while (fakeIdx === remoteIdx); }
+  const underRug = !!p.rug; // настоящий пульт спрятан под ковриком!
+  const decors = ['', '', '🧦', '🐱', '🧸', '🥫', '🕸️', '👟'];
+  const remotes = []; // {g, x, y, real}
+  function makeRemote(x, y, real) {
+    const g = svgEl('g', { transform: 'translate(' + x + ',' + y + ')', cursor: 'grab' }, svg);
+    svgEl('rect', { x: -12, y: -26, width: 24, height: 52, rx: 8, fill: real ? '#26313f' : '#f06e21', stroke: real ? '#000' : '#b34a0e', 'stroke-width': 2 }, g);
+    svgEl('circle', { cx: 0, cy: -14, r: 5, fill: real ? '#ff5252' : '#ffd23b' }, g);
+    [[-6, -2], [6, -2], [-6, 10], [6, 10], [0, 20]].forEach(([bx, by]) => svgEl('circle', { cx: bx, cy: by, r: 3.4, fill: real ? '#8b97a6' : '#ffe9b0' }, g));
+    if (!real) { const s = svgEl('text', { x: 0, y: 44, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 900, fill: '#b34a0e' }, g); s.textContent = 'той'; }
+    const r = { g, x, y, real };
+    remotes.push(r); return r;
+  }
+  positions.forEach((pos, i) => {
+    const g = svgEl('g', { transform: 'translate(' + pos.x + ',' + pos.y + ')', cursor: 'pointer' }, svg);
+    svgEl('rect', { x: -46, y: -34, width: 92, height: 68, rx: 8, fill: '#a5713d', stroke: '#7c5023', 'stroke-width': 3 }, g);
+    const inner = svgEl('g', {}, g);
+    const door = svgEl('g', {}, g);
+    svgEl('rect', { x: -38, y: -26, width: 76, height: 52, rx: 6, fill: '#c08b52', stroke: '#7c5023', 'stroke-width': 2.5 }, door);
+    svgEl('circle', { cx: 24, cy: 0, r: 5, fill: '#5c3a15' }, door);
+    let opened = false;
+    g.addEventListener('pointerdown', () => {
+      if (opened) return; opened = true; sndClick();
+      door.style.transition = 'transform .3s'; door.style.transformOrigin = '-38px 0px';
+      door.setAttribute('transform', 'translate(-58,0) scale(0.25,1)');
+      if (i === remoteIdx && !underRug) { makeRemote(pos.x, pos.y - 2, true); toast('📺 Пульт! Тащи его к телевизору!'); }
+      else if (i === fakeIdx) { makeRemote(pos.x, pos.y - 2, false); toast('Какой-то пульт… Взять?'); }
+      else { const d = decors[Math.floor(rng() * decors.length)]; if (d) { const t = svgEl('text', { x: 0, y: 10, 'text-anchor': 'middle', 'font-size': 30 }, inner); t.textContent = d; } }
+    });
+  });
+  // коврик, под которым может прятаться настоящий пульт
+  if (underRug) {
+    const rugX = 180 + rng() * 440;
+    const rug = svgEl('g', { transform: 'translate(' + rugX + ',352)', cursor: 'pointer' }, svg);
+    svgEl('ellipse', { cx: 0, cy: 0, rx: 64, ry: 17, fill: '#4f8edb', stroke: '#2f5f9e', 'stroke-width': 3 }, rug);
+    svgEl('ellipse', { cx: 0, cy: 0, rx: 42, ry: 10, fill: 'none', stroke: '#dce9fb', 'stroke-width': 3 }, rug);
+    let lifted = false;
+    rug.addEventListener('pointerdown', ev => {
+      ev.stopPropagation();
+      if (lifted) return; lifted = true; sndClick();
+      makeRemote(rugX, 344, true);
+      rug.style.transition = 'transform .4s'; rug.setAttribute('transform', 'translate(' + rugX + ',352) rotate(-22) scale(1,0.45)');
+      rug.style.opacity = 0.5; toast('📺 Вот он где! Под ковриком!');
+    });
+  }
+  let dragR = null;
+  svg.addEventListener('pointerdown', ev => { const pt = svgPt(svg, ev); for (const r of remotes) { if (Math.hypot(pt.x - r.x, pt.y - r.y) < 50) { dragR = r; ev.preventDefault(); return; } } });
+  api.on(window, 'pointermove', ev => { if (!dragR) return; const pt = svgPt(svg, ev); dragR.x = pt.x; dragR.y = pt.y; dragR.g.setAttribute('transform', 'translate(' + pt.x + ',' + pt.y + ')'); });
+  api.on(window, 'pointerup', ev => {
+    if (!dragR) return; const r = dragR; dragR = null;
+    if (r.x > 260 && r.x < 540 && r.y < 260) {
+      if (!r.real) { toast('Это ИГРУШЕЧНЫЙ пульт! 🧸 Телевизор не слушается…'); r.g.animate([{ opacity: 1 }, { opacity: 0.4 }, { opacity: 1 }], { duration: 400 }); return; }
+      tvScr.setAttribute('fill', 'url(#tvGrad)');
+      const defs = svgEl('defs', {}, svg); const gr = svgEl('linearGradient', { id: 'tvGrad', x1: 0, y1: 0, x2: 1, y2: 1 }, defs);
+      svgEl('stop', { offset: '0%', 'stop-color': '#39d0ff' }, gr); svgEl('stop', { offset: '50%', 'stop-color': '#ffd23b' }, gr); svgEl('stop', { offset: '100%', 'stop-color': '#ff6ec7' }, gr);
+      const t = svgEl('text', { x: 400, y: 158, 'text-anchor': 'middle', 'font-size': 34 }, svg); t.textContent = '📺✨';
+      api.win();
+    }
+  });
+} };
+
+// ---------- 🍦💩 ВКУСНЯШКА ИЛИ ГОВНЯШКА ----------
+TYPES.icecream = { build(svg, p, api) {
+  const n = p.n || 8, realCount = p.real || 4, rng = api.rng;
+  const idxs = shuffle([...Array(n).keys()], rng), realSet = new Set(idxs.slice(0, realCount));
+  const items = [];
+  const cols = Math.max(4, Math.ceil(n / 2)), sc = cols > 4 ? 0.82 : 1;
+  for (let i = 0; i < n; i++) {
+    const c = i % cols, r = Math.floor(i / cols);
+    const x = 100 + c * (600 / (cols - 1)), y = 250 + r * 190;
+    const g = svgEl('g', { transform: 'translate(' + x + ',' + y + ') scale(' + sc + ')', cursor: 'pointer' }, svg);
+    // палочка
+    svgEl('rect', { x: -8, y: 40, width: 16, height: 52, rx: 8, fill: '#d8a25c', stroke: '#a06c2c', 'stroke-width': 2 }, g);
+    // «шоколадная» завитушка (одинаковая у всех!)
+    const body = svgEl('g', {}, g);
+    svgEl('ellipse', { cx: 0, cy: 26, rx: 44, ry: 20, fill: '#6b4423' }, body);
+    svgEl('ellipse', { cx: 0, cy: 4, rx: 34, ry: 18, fill: '#7a4f28' }, body);
+    svgEl('ellipse', { cx: 0, cy: -16, rx: 24, ry: 15, fill: '#8a5a2e' }, body);
+    svgEl('circle', { cx: 0, cy: -34, r: 12, fill: '#96652f' }, body);
+    const st = { g, body, real: realSet.has(i), revealed: false, chosen: false, x, y, drip: null };
+    items.push(st);
+  }
+  // ☀️ солнце
+  const sun = svgEl('g', { transform: 'translate(70,120)', cursor: 'grab' }, svg);
+  for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; svgEl('line', { x1: Math.cos(a) * 40, y1: Math.sin(a) * 40, x2: Math.cos(a) * 54, y2: Math.sin(a) * 54, stroke: '#ffb300', 'stroke-width': 7, 'stroke-linecap': 'round' }, sun); }
+  svgEl('circle', { r: 34, fill: '#ffd23b', stroke: '#e8a800', 'stroke-width': 4 }, sun);
+  svgEl('circle', { cx: -10, cy: -6, r: 4, fill: '#a86e00' }, sun); svgEl('circle', { cx: 10, cy: -6, r: 4, fill: '#a86e00' }, sun);
+  svgEl('path', { d: 'M-12,10 Q0,20 12,10', stroke: '#a86e00', 'stroke-width': 4, fill: 'none', 'stroke-linecap': 'round' }, sun);
+  let sx = 70, sy = 120, dragS = false;
+  svg.addEventListener('pointerdown', ev => { const pt = svgPt(svg, ev); if (Math.hypot(pt.x - sx, pt.y - sy) < 60) { dragS = true; ev.preventDefault(); return; }
+    // клик по мороженке = выбор
+    for (const it of items) { if (it.chosen) continue; if (Math.hypot(pt.x - it.x, pt.y - it.y) < 55) { chooseItem(it); return; } }
+  });
+  api.on(window, 'pointermove', ev => {
+    if (!dragS) return; const pt = svgPt(svg, ev); sx = pt.x; sy = pt.y; sun.setAttribute('transform', 'translate(' + sx + ',' + sy + ')');
+    for (const it of items) {
+      const near = Math.hypot(sx - it.x, sy - it.y) < (p.reach || 110);
+      if (near && !it.revealed) reveal(it);
+    }
+  });
+  api.on(window, 'pointerup', () => { dragS = false; });
+  function reveal(it) {
+    it.revealed = true;
+    if (it.real) { // тает!
+      it.body.style.transition = 'transform 1s'; it.body.style.transformOrigin = '0px 40px'; it.body.setAttribute('transform', 'scale(1,0.72)');
+      it.drip = svgEl('ellipse', { cx: 0, cy: 52, rx: 30, ry: 8, fill: '#8a5a2e', opacity: 0.85 }, it.g);
+      const s = svgEl('text', { x: 30, y: -40, 'font-size': 22 }, it.g); s.textContent = '💧';
+    } else { // мухи!
+      const f = svgEl('text', { x: -42, y: -44, 'font-size': 22 }, it.g); f.textContent = '🪰';
+      const f2 = svgEl('text', { x: 26, y: -52, 'font-size': 16 }, it.g); f2.textContent = '🪰';
+    }
+  }
+  let found = 0;
+  function chooseItem(it) {
+    if (it.real) { it.chosen = true; found++; sndCoin(); const ok = svgEl('text', { x: -16, y: -56, 'font-size': 34 }, it.g); ok.textContent = '✅'; if (found >= realCount) api.win(); }
+    else { const no = svgEl('text', { x: -16, y: -56, 'font-size': 34 }, it.g); no.textContent = '💩'; api.fail(); }
+  }
+} };
+
+// ---------- 🔢 САМОЕ БОЛЬШОЕ ЧИСЛО ----------
+TYPES.bignum = { build(svg, p, api) {
+  const rng = api.rng;
+  const nums = p.nums; // [{v, size}], победитель = max v
+  const maxV = Math.max(...nums.map(o => o.v));
+  const spots = shuffle([[190, 230], [560, 210], [360, 330], [190, 430], [580, 420], [400, 500]], rng);
+  nums.forEach((o, i) => {
+    const [x, y] = spots[i];
+    const g = svgEl('g', { transform: 'translate(' + x + ',' + y + ')', cursor: 'pointer' }, svg);
+    const t = svgEl('text', { x: 0, y: 0, 'text-anchor': 'middle', 'font-size': o.size, 'font-weight': 900, fill: ['#ff5252', '#3b9bff', '#3ecf5e', '#ffb300', '#b455ff', '#00c9c9'][i % 6] }, g);
+    t.textContent = o.v;
+    g.addEventListener('pointerdown', () => { if (o.v === maxV) api.win(); else api.fail(); });
+  });
+} };
+
+// ---------- 🧠 ЗАПОМНИ И ПОВТОРИ ----------
+TYPES.memory = { build(svg, p, api) {
+  const len = p.len || 3, rng = api.rng;
+  const bulbs = [];
+  const cols = ['#ff5252', '#3ecf5e', '#3b9bff', '#ffd23b'];
+  for (let i = 0; i < 4; i++) {
+    const x = 190 + (i % 2) * 220 + 100, y = 240 + Math.floor(i / 2) * 180;
+    const g = svgEl('g', { transform: 'translate(' + x + ',' + y + ')', cursor: 'pointer' }, svg);
+    const c = svgEl('circle', { r: 62, fill: '#eef1f5', stroke: cols[i], 'stroke-width': 8 }, g);
+    bulbs.push({ g, c, col: cols[i] });
+  }
+  const seq = []; for (let i = 0; i < len; i++) seq.push(Math.floor(rng() * 4));
+  let showI = 0, inputI = 0, showing = true;
+  const info = svgEl('text', { x: 400, y: 150, 'text-anchor': 'middle', 'font-size': 26, 'font-weight': 800, fill: '#8b97a6' }, svg);
+  info.textContent = '👀 Смотри и запоминай…';
+  function flash(i, cb) { bulbs[i].c.setAttribute('fill', bulbs[i].col); blip(300 + i * 130, 0.25, 'triangle', 0.12); setTimeout(() => { bulbs[i].c.setAttribute('fill', '#eef1f5'); setTimeout(cb, 220); }, 480); }
+  function playSeq() { if (showI < seq.length) flash(seq[showI], () => { showI++; playSeq(); }); else { showing = false; info.textContent = '✋ Теперь повтори!'; } }
+  setTimeout(playSeq, 900);
+  bulbs.forEach((b, i) => b.g.addEventListener('pointerdown', () => {
+    if (showing) return;
+    b.c.setAttribute('fill', b.col); setTimeout(() => b.c.setAttribute('fill', '#eef1f5'), 240);
+    blip(300 + i * 130, 0.2, 'triangle', 0.12);
+    if (seq[inputI] === i) { inputI++; if (inputI >= seq.length) api.win(); }
+    else api.fail();
+  }));
+} };
+
+// ---------- 🔍 НАЙДИ ЛИШНЕЕ ----------
+TYPES.oddone = { build(svg, p, api) {
+  const rng = api.rng;
+  const em = p.pair || ['🐶', '🐱'];
+  const cols = p.cols || 5, rows = p.rows || 4;
+  const oddI = Math.floor(rng() * cols * rows);
+  for (let i = 0; i < cols * rows; i++) {
+    const x = 400 - (cols - 1) * 45 + (i % cols) * 90, y = 220 + Math.floor(i / cols) * 90;
+    const g = svgEl('g', { transform: 'translate(' + x + ',' + y + ')', cursor: 'pointer' }, svg);
+    const t = svgEl('text', { x: 0, y: 14, 'text-anchor': 'middle', 'font-size': 46 }, g);
+    t.textContent = (i === oddI) ? em[1] : em[0];
+    g.addEventListener('pointerdown', () => { if (i === oddI) api.win(); else api.fail(); });
+  }
+} };
+
+// ---------- 🚰 ТРУБЫ С ВОДОЙ (идея Марка!) ----------
+const DIRS = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
+const OPP = { N: 'S', S: 'N', E: 'W', W: 'E' };
+function rotDir(d) { return { N: 'E', E: 'S', S: 'W', W: 'N' }[d]; }
+TYPES.pipes = { build(svg, p, api) {
+  const W = p.w || 4, H = p.h || 3, rng = api.rng;
+  const CS = Math.min(96, Math.floor(520 / W), Math.floor(380 / H));
+  const ox = 400 - W * CS / 2, oy = 300 - H * CS / 2 + 20;
+  // строим случайный путь слева направо
+  const sr = Math.floor(rng() * H);
+  const visited = new Set(); const cells = new Map(); // 'x,y' -> {dirs:Set}
+  let x = 0, y = sr, inDir = 'W', er = sr;
+  visited.add(x + ',' + y);
+  while (true) {
+    const opts = [];
+    if (x < W - 1 && !visited.has((x + 1) + ',' + y)) opts.push('E', 'E');
+    if (y > 0 && !visited.has(x + ',' + (y - 1))) opts.push('N');
+    if (y < H - 1 && !visited.has(x + ',' + (y + 1))) opts.push('S');
+    let out;
+    if (x === W - 1 && (opts.length === 0 || rng() < 0.55)) out = 'E';
+    else if (opts.length === 0) out = 'E';
+    else out = opts[Math.floor(rng() * opts.length)];
+    cells.set(x + ',' + y, { dirs: [inDir, out] });
+    if (out === 'E' && x === W - 1) { er = y; break; }
+    x += DIRS[out][0]; y += DIRS[out][1]; inDir = OPP[out]; visited.add(x + ',' + y);
+  }
+  // кран и цветок
+  const tap = svgEl('text', { x: ox - 46, y: oy + sr * CS + CS / 2 + 14, 'font-size': 44, 'text-anchor': 'middle' }, svg); tap.textContent = '🚰';
+  const flower = svgEl('text', { x: ox + W * CS + 44, y: oy + er * CS + CS / 2 + 14, 'font-size': 44, 'text-anchor': 'middle' }, svg); flower.textContent = '🌸';
+  // тайлы
+  const tiles = [];
+  for (let cy = 0; cy < H; cy++) for (let cx = 0; cx < W; cx++) {
+    const key = cx + ',' + cy;
+    let dirs;
+    if (cells.has(key)) dirs = cells.get(key).dirs.slice();
+    else dirs = rng() < 0.5 ? ['N', 'S'] : ['N', 'E'];
+    // запутываем: случайный поворот
+    let rot = Math.floor(rng() * 4);
+    let cur = dirs.slice(); for (let k = 0; k < rot; k++) cur = cur.map(rotDir);
+    const g = svgEl('g', { transform: 'translate(' + (ox + cx * CS + CS / 2) + ',' + (oy + cy * CS + CS / 2) + ')', cursor: 'pointer' }, svg);
+    svgEl('rect', { x: -CS / 2 + 2, y: -CS / 2 + 2, width: CS - 4, height: CS - 4, rx: 10, fill: '#f2f5f9', stroke: '#dfe6ee', 'stroke-width': 2 }, g);
+    const pg = svgEl('g', {}, g);
+    const t = { g, pg, dirs: cur, cx, cy };
+    drawPipe(t);
+    g.addEventListener('pointerdown', () => { t.dirs = t.dirs.map(rotDir); drawPipe(t); sndClick(); setTimeout(check, 60); });
+    tiles.push(t);
+  }
+  function drawPipe(t, water) {
+    t.pg.innerHTML = '';
+    const col = water ? '#3b9bff' : '#9aa7b5';
+    for (const d of t.dirs) svgEl('line', { x1: 0, y1: 0, x2: DIRS[d][0] * CS / 2, y2: DIRS[d][1] * CS / 2, stroke: col, 'stroke-width': 16, 'stroke-linecap': 'round' }, t.pg);
+    svgEl('circle', { r: 10, fill: col }, t.pg);
+  }
+  function tileAt(cx, cy) { return tiles.find(t => t.cx === cx && t.cy === cy); }
+  function check() {
+    // вода течёт от крана
+    let cx = 0, cy = sr, from = 'W'; const wet = [];
+    for (let steps = 0; steps < W * H + 2; steps++) {
+      const t = tileAt(cx, cy);
+      if (!t || !t.dirs.includes(from)) return;
+      const out = t.dirs.find(d => d !== from);
+      wet.push(t);
+      if (out === 'E' && cx === W - 1) {
+        if (cy === er) { wet.forEach(w => drawPipe(w, true)); flower.textContent = '🌻'; svgEl('text', { x: ox + W * CS + 44, y: oy + er * CS + CS / 2 - 34, 'font-size': 26, 'text-anchor': 'middle' }, svg).textContent = '💧'; api.win(); }
+        return;
+      }
+      cx += DIRS[out][0]; cy += DIRS[out][1]; from = OPP[out];
+      if (cx < 0 || cy < 0 || cx >= W || cy >= H) return;
+    }
+  }
+} };
+
+// ---------- 🐱 НАЙДИ КОТИКОВ ----------
+TYPES.cats = { build(svg, p, api) {
+  const need = p.count || 4, rng = api.rng;
+  const catPos = [];
+  for (let i = 0; i < need; i++) catPos.push({ x: 90 + rng() * 620, y: 210 + rng() * 300, found: false });
+  const catsG = svgEl('g', {}, svg);
+  catPos.forEach(c => { const t = svgEl('text', { x: c.x, y: c.y, 'text-anchor': 'middle', 'font-size': 40 }, catsG); t.textContent = '🐱'; c.node = t; });
+  // мебель ПОВЕРХ котов — прячет половину
+  const furn = ['🛋️', '📦', '🌳', '🪴', '🗄️', '🧺'];
+  catPos.forEach((c, i) => { if (i % 2 === 0) { const f = svgEl('text', { x: c.x + 6, y: c.y + 26, 'text-anchor': 'middle', 'font-size': 58 }, svg); f.textContent = furn[Math.floor(rng() * furn.length)]; f.style.pointerEvents = 'none'; } });
+  for (let i = 0; i < 5; i++) { const f = svgEl('text', { x: 100 + rng() * 600, y: 220 + rng() * 290, 'text-anchor': 'middle', 'font-size': 52 }, svg); f.textContent = furn[Math.floor(rng() * furn.length)]; f.style.pointerEvents = 'none'; }
+  let found = 0;
+  const counter = svgEl('text', { x: 400, y: 165, 'text-anchor': 'middle', 'font-size': 28, 'font-weight': 900, fill: '#8b97a6' }, svg);
+  counter.textContent = '🐱 0 / ' + need;
+  svg.addEventListener('pointerdown', ev => {
+    const pt = svgPt(svg, ev);
+    for (const c of catPos) {
+      if (c.found) continue;
+      if (Math.hypot(pt.x - c.x, pt.y - c.y + 12) < 34) { c.found = true; found++; sndCoin(); svgEl('text', { x: c.x + 20, y: c.y - 28, 'font-size': 26 }, svg).textContent = '✅'; counter.textContent = '🐱 ' + found + ' / ' + need; if (found >= need) api.win(); return; }
+    }
+  });
+} };
+
+// ---------- 🦆 СКОЛЬКО УТОЧЕК? ----------
+TYPES.count = { build(svg, p, api) {
+  const k = p.k || 6, rng = api.rng;
+  const spots = [];
+  let placed = 0, guard = 0;
+  while (placed < k && guard++ < 500) {
+    let x = 110 + rng() * 580, y = 210 + rng() * 240;
+    if (placed > 0 && rng() < 0.35) { const b = spots[Math.floor(rng() * spots.length)]; x = b.x + 20 + rng() * 14; y = b.y + 6; } // прячется за соседа!
+    spots.push({ x, y }); placed++;
+  }
+  spots.forEach(s => { const t = svgEl('text', { x: s.x, y: s.y, 'text-anchor': 'middle', 'font-size': 46 }, svg); t.textContent = '🦆'; });
+  const opts = shuffle([k - 1, k, k + 1], rng);
+  opts.forEach((v, i) => {
+    const g = svgEl('g', { transform: 'translate(' + (260 + i * 140) + ',505)', cursor: 'pointer' }, svg);
+    svgEl('rect', { x: -52, y: -34, width: 104, height: 64, rx: 16, fill: v === 0 ? '#ccc' : '#fff', stroke: '#3b9bff', 'stroke-width': 4 }, g);
+    const t = svgEl('text', { x: 0, y: 12, 'text-anchor': 'middle', 'font-size': 34, 'font-weight': 900, fill: '#26313f' }, g); t.textContent = v;
+    g.addEventListener('pointerdown', () => { if (v === k) api.win(); else api.fail(); });
+  });
+} };
+
+// ---------- ⚖️ УРАВНЯЙ ВЕСЫ ----------
+TYPES.balance = { build(svg, p, api) {
+  const target = p.target || 7, weights = p.weights || [1, 2, 3, 5];
+  const beam = svgEl('g', { transform: 'translate(400,300)' }, svg);
+  svgEl('polygon', { points: '-26,150 26,150 0,40', fill: '#8b97a6' }, svg).setAttribute('transform', 'translate(400,160)');
+  const bar = svgEl('g', {}, beam);
+  svgEl('rect', { x: -230, y: -10, width: 460, height: 16, rx: 8, fill: '#64798e' }, bar);
+  const panL = svgEl('g', { transform: 'translate(-190,0)' }, bar), panR = svgEl('g', { transform: 'translate(190,0)' }, bar);
+  [panL, panR].forEach(pn => { svgEl('line', { x1: -40, y1: 8, x2: 0, y2: 68, stroke: '#64798e', 'stroke-width': 4 }, pn); svgEl('line', { x1: 40, y1: 8, x2: 0, y2: 68, stroke: '#64798e', 'stroke-width': 4 }, pn); svgEl('ellipse', { cx: 0, cy: 74, rx: 62, ry: 14, fill: '#9aa7b5' }, pn); });
+  const box = svgEl('g', {}, panL);
+  svgEl('rect', { x: -34, y: 22, width: 68, height: 46, rx: 8, fill: '#f5a623', stroke: '#b4771a', 'stroke-width': 3 }, box);
+  const bt = svgEl('text', { x: 0, y: 54, 'text-anchor': 'middle', 'font-size': 22, 'font-weight': 900, fill: '#fff' }, box); bt.textContent = target + 'кг';
+  const placed = [];
+  const items = weights.map((w, i) => {
+    const hx = 120 + i * 150, hy = 500;
+    const g = svgEl('g', { transform: 'translate(' + hx + ',' + hy + ')', cursor: 'grab' }, svg);
+    svgEl('path', { d: 'M-30,20 h60 l-10,-40 a20,14 0 0 0 -40,0 z', fill: '#5b6c7e', stroke: '#3d4b5d', 'stroke-width': 3 }, g);
+    svgEl('rect', { x: -10, y: -30, width: 20, height: 10, rx: 4, fill: '#3d4b5d' }, g);
+    const t = svgEl('text', { x: 0, y: 12, 'text-anchor': 'middle', 'font-size': 20, 'font-weight': 900, fill: '#fff' }, g); t.textContent = w;
+    return { g, w, hx, hy, x: hx, y: hy, on: false };
+  });
+  function sumR() { return items.filter(o => o.on).reduce((a, o) => a + o.w, 0); }
+  function tilt() {
+    const d = Math.max(-1, Math.min(1, (sumR() - target) / target));
+    bar.setAttribute('transform', 'rotate(' + (d * 12) + ')');
+    // гирьки едут вместе с правой чашей
+    const s = sumR();
+    let st = 0;
+    items.filter(o => o.on).forEach(o => { const a = d * 12 * Math.PI / 180; const bx = 400 + Math.cos(a) * 190, by = 300 + Math.sin(a) * 190; o.x = bx - 20 + st * 26 - 26; o.y = by + 46; o.g.setAttribute('transform', 'translate(' + o.x + ',' + o.y + ')'); st++; });
+    if (s === target) setTimeout(() => api.win(), 500);
+    else if (s > target) setTimeout(() => api.fail(), 500);
+  }
+  let drag = null;
+  svg.addEventListener('pointerdown', ev => { const pt = svgPt(svg, ev); for (const o of items) { if (Math.hypot(pt.x - o.x, pt.y - o.y) < 44) { drag = o; if (o.on) { o.on = false; tilt(); } ev.preventDefault(); return; } } });
+  api.on(window, 'pointermove', ev => { if (!drag) return; const pt = svgPt(svg, ev); drag.x = pt.x; drag.y = pt.y; drag.g.setAttribute('transform', 'translate(' + pt.x + ',' + pt.y + ')'); });
+  api.on(window, 'pointerup', () => {
+    if (!drag) return;
+    const nearPan = Math.hypot(drag.x - 590, drag.y - 374) < 120;
+    if (nearPan) { drag.on = true; } else { drag.on = false; drag.x = drag.hx; drag.y = drag.hy; drag.g.setAttribute('transform', 'translate(' + drag.hx + ',' + drag.hy + ')'); }
+    drag = null; tilt();
+  });
+  tilt();
+} };
+
+// ---------- 🌑 ВКЛЮЧИ СВЕТ ----------
+TYPES.darkroom = { build(svg, p, api) {
+  const rng = api.rng;
+  let swx = 150 + rng() * 500, swy = 220 + rng() * 260, dodges = 0;
+  const defs = svgEl('defs', {}, svg);
+  const mask = svgEl('mask', { id: 'holeMask' }, defs);
+  svgEl('rect', { x: 0, y: 0, width: 800, height: 560, fill: '#fff' }, mask);
+  const hole = svgEl('circle', { cx: -300, cy: -300, r: 95, fill: '#000' }, mask);
+  const swG = svgEl('g', { transform: 'translate(' + swx + ',' + swy + ')', cursor: 'pointer' }, svg);
+  svgEl('rect', { x: -22, y: -34, width: 44, height: 68, rx: 8, fill: '#f2f5f9', stroke: '#8b97a6', 'stroke-width': 3 }, swG);
+  svgEl('rect', { x: -10, y: -4, width: 20, height: 26, rx: 5, fill: '#ff5252' }, swG);
+  const dark = svgEl('rect', { x: 0, y: 0, width: 800, height: 560, fill: '#0b0f16', mask: 'url(#holeMask)' }, svg);
+  const hintT = svgEl('text', { x: 400, y: 300, 'text-anchor': 'middle', 'font-size': 24, 'font-weight': 800, fill: '#3d4b5d' }, svg);
+  hintT.textContent = '🌑 Темно… Води пальцем — ищи выключатель!';
+  function moveHole(ev) { const pt = svgPt(svg, ev); hole.setAttribute('cx', pt.x); hole.setAttribute('cy', pt.y);
+    if (dodges < (p.dodges == null ? 2 : p.dodges) && Math.hypot(pt.x - swx, pt.y - swy) < 120) { dodges++; swx = 150 + Math.random() * 500; swy = 220 + Math.random() * 260; swG.setAttribute('transform', 'translate(' + swx + ',' + swy + ')'); toast('Ой! Выключатель убежал! 🤭'); }
+  }
+  api.on(window, 'pointermove', moveHole);
+  svg.addEventListener('pointerdown', ev => {
+    moveHole(ev); const pt = svgPt(svg, ev);
+    if (Math.hypot(pt.x - swx, pt.y - swy) < 46) {
+      dark.remove(); hintT.remove(); swG.querySelector('rect:nth-child(2)').setAttribute('fill', '#3ecf5e');
+      svgEl('text', { x: 400, y: 200, 'text-anchor': 'middle', 'font-size': 74 }, svg).textContent = '💡';
+      blip(880, 0.15, 'square', 0.08); api.win();
+    }
+  });
+} };
+
+// ---------- 😴 РАЗБУДИ СОНЮ ----------
+TYPES.sleepy = { build(svg, p, api) {
+  const cat = svgEl('g', { transform: 'translate(400,290)' }, svg);
+  svgEl('ellipse', { cx: 0, cy: 30, rx: 110, ry: 64, fill: '#8d6e63' }, cat);
+  svgEl('circle', { cx: -80, cy: -22, r: 52, fill: '#8d6e63' }, cat);
+  svgEl('polygon', { points: '-116,-56 -96,-84 -84,-56', fill: '#8d6e63' }, cat);
+  svgEl('polygon', { points: '-76,-58 -58,-86 -46,-56', fill: '#8d6e63' }, cat);
+  svgEl('path', { d: 'M-98,-26 q8,7 16,0 M-74,-26 q8,7 16,0', stroke: '#4d3630', 'stroke-width': 4, fill: 'none', 'stroke-linecap': 'round' }, cat);
+  svgEl('path', { d: 'M-84,-4 q6,7 12,0', stroke: '#4d3630', 'stroke-width': 4, fill: 'none', 'stroke-linecap': 'round' }, cat);
+  svgEl('path', { d: 'M96,44 q34,-8 22,-38', stroke: '#8d6e63', 'stroke-width': 18, fill: 'none', 'stroke-linecap': 'round' }, cat);
+  const zzz = svgEl('text', { x: -40, y: -90, 'font-size': 38 }, cat); zzz.textContent = '💤';
+  const items = [ { e: '🪶', msg: 'Хи-хи! Щекотно… но он спит дальше!' }, { e: '⏰', win: true }, { e: '📣', msg: 'Тише! Соседи заругаются! 🙉' } ];
+  const objs = items.map((it, i) => {
+    const x = 180 + i * 220, y = 505;
+    const t = svgEl('text', { x: 0, y: 0, 'text-anchor': 'middle', 'font-size': 52, cursor: 'grab', transform: 'translate(' + x + ',' + y + ')' }, svg); t.textContent = it.e;
+    return { t, it, hx: x, hy: y, x, y };
+  });
+  let drag = null;
+  svg.addEventListener('pointerdown', ev => { const pt = svgPt(svg, ev); for (const o of objs) { if (Math.hypot(pt.x - o.x, pt.y - o.y + 18) < 46) { drag = o; ev.preventDefault(); return; } } });
+  api.on(window, 'pointermove', ev => { if (!drag) return; const pt = svgPt(svg, ev); drag.x = pt.x; drag.y = pt.y; drag.t.setAttribute('transform', 'translate(' + pt.x + ',' + pt.y + ')'); });
+  api.on(window, 'pointerup', () => {
+    if (!drag) return;
+    const nearCat = Math.hypot(drag.x - 320, drag.y - 268) < 150;
+    if (nearCat) {
+      if (drag.it.win) {
+        if (actx && S.sound) { const t0 = actx.currentTime; for (let i = 0; i < 6; i++) blip(1400, 0.07, 'square', 0.1, t0 + i * 0.09); }
+        zzz.textContent = '❗'; svgEl('path', { d: 'M-98,-30 q8,-10 16,0 M-74,-30 q8,-10 16,0', stroke: '#1b1b1b', 'stroke-width': 4, fill: 'none' }, cat);
+        setTimeout(() => api.win(), 600);
+      } else { toast(drag.it.msg); }
+    }
+    drag.x = drag.hx; drag.y = drag.hy; drag.t.setAttribute('transform', 'translate(' + drag.hx + ',' + drag.hy + ')');
+    drag = null;
+  });
+} };
+
+// ---------- 🌀 ЛАБИРИНТ ПАЛЬЦЕМ ----------
+const MAZE_PATHS = [
+  [[90, 480], [90, 240], [330, 240], [330, 440], [560, 440], [560, 200], [710, 200]],
+  [[90, 220], [280, 220], [280, 460], [470, 460], [470, 230], [710, 230], [710, 430]],
+  [[90, 470], [230, 470], [230, 230], [420, 230], [420, 470], [590, 470], [590, 230], [710, 230]],
+];
+TYPES.mazefinger = { build(svg, p, api) {
+  const pts = MAZE_PATHS[(p.variant || 0) % MAZE_PATHS.length];
+  const tol = p.tol || 34, rng = api.rng;
+  const d = 'M' + pts.map(q => q[0] + ',' + q[1]).join(' L');
+  svgEl('path', { d, stroke: '#e2e9f2', 'stroke-width': tol * 2, fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, svg);
+  svgEl('path', { d, stroke: '#c6d2e0', 'stroke-width': 4, fill: 'none', 'stroke-dasharray': '10 12' }, svg);
+  const start = pts[0], end = pts[pts.length - 1];
+  // 🕸️ паутинки-ловушки на дороге (как в Паучьем лабиринте!) — их надо аккуратно объезжать
+  const webs = [];
+  const nWebs = p.webs || 0;
+  if (nWebs) {
+    const segIdx = shuffle([...Array(pts.length - 1).keys()].slice(1), rng); // не на стартовом отрезке
+    for (let w = 0; w < nWebs && w < segIdx.length; w++) {
+      const i = segIdx[w];
+      const [x1, y1] = pts[i], [x2, y2] = pts[i + 1];
+      const t = 0.35 + rng() * 0.3;
+      const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1;
+      const off = (rng() - 0.5) * tol * 0.9; // чуть в сторону от середины дороги
+      const wx = x1 + dx * t - dy / L * off, wy = y1 + dy * t + dx / L * off;
+      const wt = svgEl('text', { x: wx, y: wy + 11, 'text-anchor': 'middle', 'font-size': 30 }, svg); wt.textContent = '🕸️';
+      webs.push({ x: wx, y: wy });
+    }
+  }
+  svgEl('circle', { cx: start[0], cy: start[1], r: 26, fill: '#3ecf5e' }, svg);
+  const star = svgEl('text', { x: end[0], y: end[1] + 14, 'text-anchor': 'middle', 'font-size': 42 }, svg); star.textContent = '⭐';
+  const bug = svgEl('text', { x: start[0], y: start[1] + 12, 'text-anchor': 'middle', 'font-size': 36 }, svg); bug.textContent = '🐞';
+  let tracking = false;
+  function distToPath(x, y) {
+    let best = 1e9;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [x1, y1] = pts[i], [x2, y2] = pts[i + 1];
+      const dx = x2 - x1, dy = y2 - y1, L2 = dx * dx + dy * dy;
+      let t = L2 ? ((x - x1) * dx + (y - y1) * dy) / L2 : 0; t = Math.max(0, Math.min(1, t));
+      best = Math.min(best, Math.hypot(x - (x1 + dx * t), y - (y1 + dy * t)));
+    }
+    return best;
+  }
+  svg.addEventListener('pointerdown', ev => { const pt = svgPt(svg, ev); if (Math.hypot(pt.x - start[0], pt.y - start[1]) < 40) { tracking = true; } });
+  api.on(window, 'pointermove', ev => {
+    if (!tracking) return; const pt = svgPt(svg, ev);
+    if (distToPath(pt.x, pt.y) > tol) { tracking = false; bug.setAttribute('x', start[0]); bug.setAttribute('y', start[1] + 12); toast('Ой, стенка! 🧱 Начни с зелёного круга'); return; }
+    for (const w of webs) if (Math.hypot(pt.x - w.x, pt.y - w.y) < 17) { tracking = false; bug.setAttribute('x', start[0]); bug.setAttribute('y', start[1] + 12); toast('Паутина! 🕸️ Жучок прилип — начни сначала!'); return; }
+    bug.setAttribute('x', pt.x); bug.setAttribute('y', pt.y + 12);
+    if (Math.hypot(pt.x - end[0], pt.y - end[1]) < 34) { tracking = false; api.win(); }
+  });
+  api.on(window, 'pointerup', () => { tracking = false; });
+} };
+
+// ---------- 🧹 ВКЛЮЧИ ПЫЛЕСОС (идея Марка!) ----------
+TYPES.vacuum = { build(svg, p, api) {
+  const rng = api.rng;
+  const pos = p.pos || 'right', needBtn = !!p.needBtn;
+  // комната: стена + пол
+  svgEl('rect', { x: 0, y: 0, width: 800, height: 330, fill: '#eaf2fb' }, svg);
+  svgEl('rect', { x: 0, y: 330, width: 800, height: 230, fill: '#c9a06a' }, svg);
+  svgEl('rect', { x: 0, y: 330, width: 800, height: 10, fill: '#a87f4c' }, svg);
+  // ковёр с орнаментом (как в Марк Карте!)
+  const carpet = svgEl('g', { transform: 'translate(400,455)' }, svg);
+  svgEl('rect', { x: -240, y: -75, width: 480, height: 150, rx: 14, fill: '#9c1717', stroke: '#e3b23c', 'stroke-width': 7 }, carpet);
+  for (let i = -1; i <= 1; i++) { svgEl('path', { d: 'M' + (i * 120 - 30) + ',0 L' + (i * 120) + ',-38 L' + (i * 120 + 30) + ',0 L' + (i * 120) + ',38 Z', fill: 'none', stroke: '#e3b23c', 'stroke-width': 4 }, carpet); svgEl('circle', { cx: i * 120, cy: 0, r: 8, fill: '#e3b23c' }, carpet); }
+  // пыль на ковре
+  const dust = [];
+  for (let i = 0; i < 6; i++) { const d = svgEl('circle', { cx: 400 - 190 + rng() * 380, cy: 415 + rng() * 80, r: 5 + rng() * 5, fill: '#8b97a6', opacity: 0.75 }, svg); dust.push(d); }
+  // где розетка? (каждый раз в новом месте!)
+  const sockX = pos === 'right' ? 700 : (pos === 'left' ? 100 : 620);
+  const sockY = pos === 'hidden' ? 160 : 300;
+  let sockOpen = (pos !== 'hidden'); // за картиной — пока закрыта
+  const sock = svgEl('g', { transform: 'translate(' + sockX + ',' + sockY + ')', visibility: sockOpen ? 'visible' : 'hidden' }, svg);
+  svgEl('rect', { x: -20, y: -24, width: 40, height: 48, rx: 8, fill: '#f2f5f9', stroke: '#8b97a6', 'stroke-width': 3.5 }, sock);
+  svgEl('circle', { cx: -6, cy: 0, r: 3.4, fill: '#26313f' }, sock);
+  svgEl('circle', { cx: 6, cy: 0, r: 3.4, fill: '#26313f' }, sock);
+  // картина: обычно просто украшение, но в хитром уровне ЗА НЕЙ розетка!
+  const picX = pos === 'hidden' ? sockX : (pos === 'left' ? 620 : 135);
+  const picY = pos === 'hidden' ? sockY : 132;
+  const pic = svgEl('g', { transform: 'translate(' + picX + ',' + picY + ')', cursor: pos === 'hidden' ? 'pointer' : 'default' }, svg);
+  svgEl('rect', { x: -55, y: -42, width: 110, height: 84, rx: 6, fill: '#fff', stroke: '#8b97a6', 'stroke-width': 5 }, pic);
+  svgEl('text', { x: 0, y: 13, 'text-anchor': 'middle', 'font-size': 40 }, pic).textContent = '🌄';
+  if (pos === 'hidden') pic.addEventListener('pointerdown', ev => {
+    ev.stopPropagation(); if (sockOpen) return; sockOpen = true; sndClick();
+    pic.style.transition = 'transform .55s'; pic.setAttribute('transform', 'translate(' + picX + ',' + (picY + 150) + ') rotate(-14)');
+    setTimeout(() => { pic.style.opacity = 0.55; }, 400);
+    sock.setAttribute('visibility', 'visible');
+    toast('Ого! За картиной РОЗЕТКА! 🔌');
+  });
+  // пылесос
+  const vx = pos === 'left' ? 535 : 265, vy = 360;
+  const mir = pos === 'left' ? -1 : 1; // куда смотрит шнур
+  const vac = svgEl('g', { transform: 'translate(' + vx + ',' + vy + ')' }, svg);
+  svgEl('ellipse', { cx: 0, cy: 26, rx: 22, ry: 8, fill: 'rgba(0,0,0,.18)' }, vac);
+  svgEl('path', { d: 'M-52,18 a52,44 0 0 1 104,0 z', fill: '#3b9bff', stroke: '#1d5ba8', 'stroke-width': 4 }, vac);
+  svgEl('rect', { x: -52, y: 14, width: 104, height: 14, rx: 7, fill: '#2f7fe0', stroke: '#1d5ba8', 'stroke-width': 3 }, vac);
+  svgEl('circle', { cx: -30, cy: 30, r: 10, fill: '#26313f' }, vac); svgEl('circle', { cx: 30, cy: 30, r: 10, fill: '#26313f' }, vac);
+  svgEl('path', { d: 'M-48,-6 q-42,-4 -58,34 q-6,16 8,20', stroke: '#64798e', 'stroke-width': 10, fill: 'none', 'stroke-linecap': 'round' }, vac); // шланг
+  svgEl('rect', { x: -112, y: 44, width: 24, height: 12, rx: 5, fill: '#3d4b5d' }, vac); // насадка
+  const eye1 = svgEl('circle', { cx: -12, cy: -10, r: 5, fill: '#fff' }, vac), eye2 = svgEl('circle', { cx: 12, cy: -10, r: 5, fill: '#fff' }, vac);
+  svgEl('circle', { cx: -12, cy: -10, r: 2.4, fill: '#26313f' }, vac); svgEl('circle', { cx: 12, cy: -10, r: 2.4, fill: '#26313f' }, vac);
+  // кнопка
+  const btn = svgEl('circle', { cx: 0, cy: 6, r: 11, fill: '#ff5252', stroke: '#a82626', 'stroke-width': 3, cursor: 'pointer' }, vac);
+  // шнур и вилка (mir = в какую сторону тянется шнур)
+  let plugX = vx + 88 * mir, plugY = 420, plugged = false, presses = 0, running = false;
+  const cord = svgEl('path', { d: '', stroke: '#26313f', 'stroke-width': 6, fill: 'none', 'stroke-linecap': 'round' }, svg);
+  const plug = svgEl('g', { cursor: 'grab' }, svg);
+  svgEl('rect', { x: -16, y: -12, width: 28, height: 24, rx: 7, fill: '#26313f' }, plug);
+  svgEl('rect', { x: 12, y: -8, width: 14, height: 5, rx: 2.5, fill: '#c9a44a' }, plug);
+  svgEl('rect', { x: 12, y: 3, width: 14, height: 5, rx: 2.5, fill: '#c9a44a' }, plug);
+  function drawCord() {
+    plug.setAttribute('transform', 'translate(' + plugX + ',' + plugY + ') scale(' + mir + ',1)');
+    const sx = vx + 46 * mir, sy = vy + 10;
+    cord.setAttribute('d', 'M' + sx + ',' + sy + ' Q' + ((sx + plugX) / 2) + ',' + (Math.max(sy, plugY) + 46) + ' ' + (plugX - 14 * mir) + ',' + plugY);
+  }
+  drawCord();
+  function startMotor() {
+    if (running) return; running = true;
+    btn.setAttribute('fill', '#3ecf5e'); btn.setAttribute('stroke', '#1d8f3d');
+    // мотор жужжит! (звук — как просил Марк)
+    if (actx && S.sound) { const o = actx.createOscillator(), g = actx.createGain(); o.type = 'sawtooth'; o.frequency.value = 85; const l = actx.createBiquadFilter(); l.type = 'lowpass'; l.frequency.value = 350; o.connect(l); l.connect(g); g.connect(actx.destination); const t0 = actx.currentTime; g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(0.09, t0 + 0.15); o.frequency.linearRampToValueAtTime(130, t0 + 1.2); g.gain.linearRampToValueAtTime(0.0001, t0 + 1.5); o.start(t0); o.stop(t0 + 1.6); }
+    // пыль всасывается
+    dust.forEach((d, i) => { d.style.transition = 'all .9s ease-in ' + (i * 0.08) + 's'; setTimeout(() => { d.setAttribute('cx', vx - 100 * mir); d.setAttribute('cy', vy + 50); d.setAttribute('r', 1); d.style.opacity = 0; }, 30); });
+    vac.animate([{ transform: 'translate(' + vx + 'px,' + (vy - 2) + 'px)' }, { transform: 'translate(' + vx + 'px,' + (vy + 2) + 'px)' }, { transform: 'translate(' + vx + 'px,' + vy + 'px)' }], { duration: 240, iterations: 5 });
+    setTimeout(() => api.win(), 1400);
+  }
+  btn.addEventListener('pointerdown', ev => {
+    ev.stopPropagation();
+    if (running) return;
+    if (plugged) { if (needBtn) { sndClick(); startMotor(); } return; }
+    presses++; sndClick();
+    vac.animate([{ transform: 'translate(' + (vx - 3) + 'px,' + vy + 'px)' }, { transform: 'translate(' + (vx + 3) + 'px,' + vy + 'px)' }, { transform: 'translate(' + vx + 'px,' + vy + 'px)' }], { duration: 200 });
+    toast(presses < 2 ? 'Пшш… Тишина. Не включается! 🤔' : 'Хм… А откуда пылесосу взять электричество? ⚡');
+  });
+  let dragP = false;
+  svg.addEventListener('pointerdown', ev => { const pt = svgPt(svg, ev); if (!plugged && Math.hypot(pt.x - plugX, pt.y - plugY) < 42) { dragP = true; ev.preventDefault(); } });
+  api.on(window, 'pointermove', ev => { if (!dragP) return; const pt = svgPt(svg, ev); plugX = pt.x; plugY = pt.y; drawCord(); });
+  api.on(window, 'pointerup', () => {
+    if (!dragP) return; dragP = false;
+    if (sockOpen && Math.hypot(plugX - (sockX - 22 * mir), plugY - sockY) < 46) {
+      plugged = true; plugX = sockX - 24 * mir; plugY = sockY; drawCord();
+      svgEl('text', { x: sockX - 8 * mir, y: sockY - 36, 'text-anchor': 'middle', 'font-size': 26 }, svg).textContent = '⚡';
+      if (needBtn) { sndCoin(); toast('Электричество есть! ⚡ Теперь жми кнопку на пылесосе!'); }
+      else startMotor();
+    }
+  });
+} };
+
+// ---------- ✏️ ОДНИМ РОСЧЕРКОМ (идея Марка!) ----------
+TYPES.onestroke = { build(svg, p, api) {
+  const n = p.n || 5, noCross = !!p.noCross, rng = api.rng;
+  // расставляем точки не слишком близко друг к другу
+  const dots = [];
+  let guard = 0;
+  while (dots.length < n && guard++ < 900) {
+    const x = 120 + rng() * 560, y = 200 + rng() * 300;
+    if (dots.every(d => Math.hypot(d.x - x, d.y - y) > 95)) dots.push({ x, y, hit: false });
+  }
+  const linesG = svgEl('g', {}, svg);
+  const dotsG = svgEl('g', {}, svg);
+  const tempLine = svgEl('line', { stroke: '#3b9bff', 'stroke-width': 7, 'stroke-linecap': 'round', opacity: 0.6, visibility: 'hidden' }, svg);
+  dots.forEach(d => {
+    d.c = svgEl('circle', { cx: d.x, cy: d.y, r: 19, fill: '#fff', stroke: '#3b9bff', 'stroke-width': 5 }, dotsG);
+  });
+  const counter = svgEl('text', { x: 400, y: 165, 'text-anchor': 'middle', 'font-size': 26, 'font-weight': 900, fill: '#8b97a6' }, svg);
+  function setCounter() { counter.textContent = '● ' + dots.filter(d => d.hit).length + ' / ' + n + (noCross ? ' · не пересекай линию!' : ''); }
+  setCounter();
+  let path = [], drawing = false; // path = посещённые точки по порядку
+  const segs = [];
+  function segsCross(a1, a2, b1, b2) {
+    const d = (P, Q, R) => (Q.x - P.x) * (R.y - P.y) - (Q.y - P.y) * (R.x - P.x);
+    const s1 = d(a1, a2, b1), s2 = d(a1, a2, b2), s3 = d(b1, b2, a1), s4 = d(b1, b2, a2);
+    return ((s1 > 0) !== (s2 > 0)) && ((s3 > 0) !== (s4 > 0));
+  }
+  function resetStroke(msg) {
+    path = []; segs.length = 0; drawing = false;
+    linesG.innerHTML = ''; tempLine.setAttribute('visibility', 'hidden');
+    dots.forEach(d => { d.hit = false; d.c.setAttribute('fill', '#fff'); });
+    setCounter();
+    if (msg) toast(msg);
+  }
+  function tryHit(pt) {
+    for (const d of dots) {
+      if (d.hit || Math.hypot(pt.x - d.x, pt.y - d.y) > 30) continue;
+      if (path.length) {
+        const prev = path[path.length - 1];
+        const newSeg = [{ x: prev.x, y: prev.y }, { x: d.x, y: d.y }];
+        if (noCross) for (let i = 0; i < segs.length - 1; i++) { // соседний сегмент касается в точке — его пропускаем
+          if (segsCross(newSeg[0], newSeg[1], segs[i][0], segs[i][1])) { resetStroke('Линии перекрестились! ✖️ Начни заново'); return; }
+        }
+        segs.push(newSeg);
+        svgEl('line', { x1: prev.x, y1: prev.y, x2: d.x, y2: d.y, stroke: '#3b9bff', 'stroke-width': 7, 'stroke-linecap': 'round' }, linesG);
+      }
+      d.hit = true; d.c.setAttribute('fill', '#9fd8ff');
+      blip(500 + path.length * 60, 0.08, 'triangle', 0.09);
+      path.push(d); setCounter();
+      if (path.length >= n) { drawing = false; tempLine.setAttribute('visibility', 'hidden'); api.win(); }
+      return;
+    }
+  }
+  svg.addEventListener('pointerdown', ev => { const pt = svgPt(svg, ev); drawing = true; tryHit(pt); if (path.length) { tempLine.setAttribute('visibility', 'visible'); } ev.preventDefault(); });
+  api.on(window, 'pointermove', ev => {
+    if (!drawing) return; const pt = svgPt(svg, ev);
+    if (path.length) { const prev = path[path.length - 1]; tempLine.setAttribute('x1', prev.x); tempLine.setAttribute('y1', prev.y); tempLine.setAttribute('x2', pt.x); tempLine.setAttribute('y2', pt.y); }
+    tryHit(pt);
+  });
+  api.on(window, 'pointerup', () => { if (!drawing) return; if (path.length < n) resetStroke(path.length ? 'Ой! Палец оторвался — начни заново ☝️' : ''); });
+} };
+
+// ---------- 🧲 МАГНИТ И ВИНТИКИ (идея Марка!) ----------
+TYPES.magnet = { build(svg, p, api) {
+  const n = p.n || 6, nb = p.boxes || 4, rng = api.rng;
+  // рассыпанные винтики и гайки — руками не трогать!
+  const screws = [];
+  let guard = 0;
+  while (screws.length < n && guard++ < 600) {
+    const x = 100 + rng() * 600, y = 195 + rng() * 210;
+    if (screws.every(s => Math.hypot(s.x - x, s.y - y) > 62)) {
+      const t = svgEl('text', { x, y, 'text-anchor': 'middle', 'font-size': 34, transform: 'rotate(' + Math.floor(rng() * 360) + ' ' + x + ' ' + y + ')' }, svg);
+      t.textContent = rng() < 0.5 ? '🔩' : '⚙️';
+      screws.push({ x, y, node: t, stuck: false });
+    }
+  }
+  // ящики внизу — в одном из них магнит!
+  const magnetIdx = Math.floor(rng() * nb);
+  const decors = ['🧸', '🧦', '🥄', '🎲', '🧵'];
+  let magnet = null, magX = 0, magY = 0;
+  for (let i = 0; i < nb; i++) {
+    const bx = 130 + i * (540 / Math.max(1, nb - 1)), by = 495;
+    const g = svgEl('g', { transform: 'translate(' + bx + ',' + by + ')', cursor: 'pointer' }, svg);
+    svgEl('rect', { x: -48, y: -30, width: 96, height: 60, rx: 9, fill: '#8a5a2b', stroke: '#5f3d1c', 'stroke-width': 3 }, g);
+    const inner = svgEl('g', {}, g);
+    const lid = svgEl('rect', { x: -48, y: -42, width: 96, height: 18, rx: 6, fill: '#a5713d', stroke: '#5f3d1c', 'stroke-width': 3 }, g);
+    let opened = false;
+    g.addEventListener('pointerdown', ev => {
+      ev.stopPropagation();
+      if (opened) return; opened = true; sndClick();
+      lid.style.transition = 'transform .3s'; lid.style.transformOrigin = '-48px -42px'; lid.setAttribute('transform', 'rotate(-70)');
+      if (i === magnetIdx) {
+        magX = bx; magY = by - 8;
+        magnet = svgEl('text', { x: 0, y: 0, 'text-anchor': 'middle', 'font-size': 46, cursor: 'grab', transform: 'translate(' + magX + ',' + magY + ')' }, svg);
+        magnet.textContent = '🧲';
+        toast('МАГНИТ! 🧲 Тащи его к винтикам!');
+      } else { const t = svgEl('text', { x: 0, y: 4, 'text-anchor': 'middle', 'font-size': 26 }, inner); t.textContent = decors[Math.floor(rng() * decors.length)]; }
+    });
+  }
+  const counter = svgEl('text', { x: 400, y: 165, 'text-anchor': 'middle', 'font-size': 26, 'font-weight': 900, fill: '#8b97a6' }, svg);
+  function setC() { counter.textContent = '🔩 ' + screws.filter(s => s.stuck).length + ' / ' + n; }
+  setC();
+  let dragM = false, warned = false;
+  svg.addEventListener('pointerdown', ev => {
+    const pt = svgPt(svg, ev);
+    if (magnet && Math.hypot(pt.x - magX, pt.y - magY + 16) < 46) { dragM = true; ev.preventDefault(); return; }
+    // пальцем по винтику — ай!
+    for (const s of screws) {
+      if (s.stuck || Math.hypot(pt.x - s.x, pt.y - s.y + 10) > 30) continue;
+      if (!warned) { warned = true; toast('АЙ! 🩹 Они острые — руками НЕЛЬЗЯ! Поищи в ящиках…'); blip(220, 0.3, 'sawtooth', 0.08); }
+      else api.fail();
+      return;
+    }
+  });
+  api.on(window, 'pointermove', ev => {
+    if (!dragM) return; const pt = svgPt(svg, ev);
+    magX = pt.x; magY = pt.y;
+    magnet.setAttribute('transform', 'translate(' + magX + ',' + magY + ')');
+    let k = 0;
+    for (const s of screws) {
+      if (!s.stuck && Math.hypot(magX - s.x, magY - s.y) < 72) { s.stuck = true; blip(900 + k * 80, 0.08, 'triangle', 0.1); setC(); }
+      if (s.stuck) { const a = (screws.indexOf(s) / n) * Math.PI * 2; const nx = magX + Math.cos(a) * 30, ny = magY + 26 + Math.sin(a) * 12; s.node.setAttribute('x', nx); s.node.setAttribute('y', ny); s.node.setAttribute('transform', 'rotate(0 0 0)'); k++; }
+    }
+    if (screws.every(s => s.stuck)) { dragM = false; setTimeout(() => api.win(), 350); }
+  });
+  api.on(window, 'pointerup', () => { dragM = false; });
+} };
+
+// ---------- 🎭 УРОВНИ-ПРИКОЛЫ ----------
+TYPES.trick_bulb = { build(svg, p, api) {
+  const g = svgEl('g', { transform: 'translate(400,320)', cursor: 'pointer' }, svg);
+  svgEl('circle', { r: 90, fill: '#eef1f5', stroke: '#b9c2cd', 'stroke-width': 6 }, g);
+  svgEl('path', { d: 'M-26,74 h52 v18 a14 14 0 0 1 -14 14 h-24 a14 14 0 0 1 -14 -14 z', fill: '#9aa7b5' }, g);
+  let tries = 0;
+  g.addEventListener('pointerdown', () => { tries++; sndClick(); g.animate([{ transform: 'translate(396px,320px)' }, { transform: 'translate(404px,320px)' }, { transform: 'translate(400px,320px)' }], { duration: 180 }); toast(tries < 2 ? 'Хм, эта лампа не работает… 🤔' : 'А может, зелёная лампочка ВВЕРХУ экрана?.. 😏'); });
+} };
+TYPES.trick_math = { build(svg, p, api) {
+  const t = svgEl('text', { x: 400, y: 230, 'text-anchor': 'middle', 'font-size': 74, 'font-weight': 900, fill: '#26313f' }, svg); t.textContent = '2 + 2 × 2 = ?';
+  [8, 6, 4].forEach((v, i) => {
+    const g = svgEl('g', { transform: 'translate(' + (240 + i * 160) + ',400)', cursor: 'pointer' }, svg);
+    svgEl('rect', { x: -56, y: -40, width: 112, height: 78, rx: 18, fill: '#fff', stroke: '#3b9bff', 'stroke-width': 5 }, g);
+    const n = svgEl('text', { x: 0, y: 16, 'text-anchor': 'middle', 'font-size': 42, 'font-weight': 900, fill: '#26313f' }, g); n.textContent = v;
+    g.addEventListener('pointerdown', () => { if (v === 6) api.win(); else api.fail(); });
+  });
+} };
+TYPES.trick_door = { build(svg, p, api) {
+  const door = svgEl('g', { transform: 'translate(400,330)' }, svg);
+  svgEl('rect', { x: -110, y: -180, width: 220, height: 360, rx: 8, fill: '#a5713d', stroke: '#7c5023', 'stroke-width': 6 }, door);
+  svgEl('rect', { x: -80, y: -150, width: 160, height: 140, rx: 6, fill: 'none', stroke: '#7c5023', 'stroke-width': 4 }, door);
+  svgEl('rect', { x: -80, y: 20, width: 160, height: 140, rx: 6, fill: 'none', stroke: '#7c5023', 'stroke-width': 4 }, door);
+  const handle = svgEl('g', { transform: 'translate(70,0)', cursor: 'grab' }, door);
+  svgEl('circle', { r: 16, fill: '#e8b64c', stroke: '#a97b16', 'stroke-width': 4 }, handle);
+  let dy = 0, dragging = false, clicks = 0;
+  svg.addEventListener('pointerdown', ev => { const pt = svgPt(svg, ev); if (Math.hypot(pt.x - 470, pt.y - 330) < 42) { dragging = true; dy = pt.y; ev.preventDefault(); } else if (Math.abs(pt.x - 400) < 115 && Math.abs(pt.y - 330) < 185) { clicks++; toast(clicks < 2 ? 'Тук-тук! Закрыто… 🚪' : 'Может, дёрнуть за ручку ВНИЗ? 🤔'); } });
+  api.on(window, 'pointermove', ev => { if (!dragging) return; const pt = svgPt(svg, ev); const off = Math.max(0, Math.min(60, pt.y - dy)); handle.setAttribute('transform', 'translate(70,' + off + ') rotate(' + off * 0.7 + ')'); if (off >= 58) { dragging = false; door.style.transition = 'transform .6s'; door.style.transformOrigin = '290px 330px'; door.setAttribute('transform', 'translate(400,330) scale(0.12,1)'); svgEl('text', { x: 400, y: 330, 'text-anchor': 'middle', 'font-size': 60 }, svg).textContent = '🌞'; setTimeout(() => api.win(), 500); } });
+  api.on(window, 'pointerup', () => { if (dragging) { dragging = false; handle.setAttribute('transform', 'translate(70,0)'); } });
+} };
+TYPES.trick_pet = { build(svg, p, api) {
+  const cat = svgEl('g', { transform: 'translate(400,320)' }, svg);
+  svgEl('ellipse', { cx: 0, cy: 40, rx: 95, ry: 70, fill: '#e8a33d' }, cat);
+  svgEl('circle', { cx: 0, cy: -50, r: 56, fill: '#e8a33d' }, cat);
+  svgEl('polygon', { points: '-46,-86 -30,-118 -14,-88', fill: '#e8a33d' }, cat);
+  svgEl('polygon', { points: '14,-88 30,-118 46,-86', fill: '#e8a33d' }, cat);
+  svgEl('circle', { cx: -18, cy: -56, r: 7, fill: '#1b1b1b' }, cat); svgEl('circle', { cx: 18, cy: -56, r: 7, fill: '#1b1b1b' }, cat);
+  svgEl('path', { d: 'M-10,-38 q10,10 20,0', stroke: '#1b1b1b', 'stroke-width': 4, fill: 'none' }, cat);
+  const heart = svgEl('text', { x: 400, y: 180, 'text-anchor': 'middle', 'font-size': 34, 'font-weight': 900, fill: '#ff5252' }, svg);
+  heart.textContent = '🤍🤍🤍🤍🤍';
+  let strokes = 0, lastX = null, acc = 0;
+  api.on(window, 'pointermove', ev => {
+    const pt = svgPt(svg, ev);
+    if (Math.hypot(pt.x - 400, pt.y - 320) > 130) { lastX = null; return; }
+    if (ev.buttons === 0 && ev.pointerType !== 'touch') return;
+    if (lastX != null) acc += Math.abs(pt.x - lastX);
+    lastX = pt.x;
+    if (acc > 130) { acc = 0; strokes++; heart.textContent = '❤️'.repeat(Math.min(5, strokes)) + '🤍'.repeat(Math.max(0, 5 - strokes)); blip(200 + strokes * 40, 0.3, 'sine', 0.06); if (strokes >= 5) { svgEl('text', { x: 480, y: 250, 'font-size': 34 }, svg).textContent = '😻'; setTimeout(() => api.win(), 400); } }
+  });
+} };
+
+// ==========================================================================
+//  УРОВНИ
+// ==========================================================================
+const LEVELS = [];
+const BIGNUM_SETS = [
+  [{ v: 999, size: 74 }, { v: 1030, size: 26 }, { v: 88, size: 58 }, { v: 501, size: 40 }],
+  [{ v: 606, size: 70 }, { v: 660, size: 24 }, { v: 66, size: 52 }, { v: 600, size: 40 }],
+  [{ v: 5555, size: 22 }, { v: 999, size: 76 }, { v: 1200, size: 40 }, { v: 800, size: 56 }],
+  [{ v: 9, size: 88 }, { v: 10, size: 16 }, { v: 8, size: 60 }, { v: 7, size: 40 }],
+  [{ v: 12345, size: 18 }, { v: 9999, size: 66 }, { v: 11111, size: 30 }, { v: 5432, size: 48 }],
+  [{ v: 302, size: 60 }, { v: 320, size: 22 }, { v: 230, size: 44 }, { v: 203, size: 70 }],
+  [{ v: 1000000, size: 16 }, { v: 999999, size: 72 }, { v: 500000, size: 40 }, { v: 99999, size: 88 }],
+  [{ v: 42, size: 80 }, { v: 43, size: 12 }, { v: 24, size: 56 }, { v: 34, size: 36 }],
+];
+const ODD_PAIRS = [['🐶', '🐱'], ['🍩', '🍪'], ['😺', '😸'], ['🐸', '🦎'], ['⭐', '🌟'], ['🍦', '💩'], ['🐝', '🪰'], ['🌸', '🌺']];
+const ODD_GRID = [[5, 4], [5, 4], [6, 4], [6, 4], [7, 5], [7, 5], [8, 5], [8, 5]];
+// генераторы уровней по раундам сложности r = 0..7
+const GEN = {
+  wires: r => ({ p: { n: [3, 4, 4, 5, 5, 6, 7, 8][r], extra: [1, 2, 3, 3, 4, 4, 5, 6][r] }, task: 'Соедини провода с розетками по цвету. Провода НЕ должны пересекаться!', hint: 'Розеток больше, чем проводов! Выбирай такие, чтобы линии шли ровно и не перекрещивались.' }),
+  icecream: r => ({ p: { n: [8, 8, 10, 10, 12, 12, 12, 12][r], real: [4, 3, 4, 2, 3, 3, 2, 1][r], reach: [110, 110, 100, 95, 90, 85, 80, 75][r] }, task: 'Найди все вкусняшки (' + [4, 3, 4, 2, 3, 3, 2, 1][r] + ' шт)! Не трогай говняшки… 🤢', hint: 'Подтащи ☀️ солнышко ПОБЛИЖЕ к каждой: настоящее мороженое ТАЕТ, а к какашке слетаются мухи!' }),
+  tvroom: r => ({ p: { n: [6, 8, 10, 12, 10, 12, 12, 12][r], fake: r >= 2, rug: r >= 5 }, task: 'Включи телевизор! Где-то спрятан пульт…', hint: r >= 5 ? 'В тумбочках только обманки! Настоящий пульт спрятался под КОВРИКОМ на полу!' : (r >= 2 ? 'Осторожно: один из пультов ИГРУШЕЧНЫЙ 🧸 — он оранжевый и телевизор не включает! Ищи настоящий, тёмный.' : 'Открывай все дверцы подряд! Нашёл пульт — тащи его пальцем прямо к телевизору.') }),
+  bignum: r => ({ p: { nums: BIGNUM_SETS[r] }, task: 'Нажми на САМОЕ БОЛЬШОЕ число!', hint: 'Размер букв — ловушка! Сравнивай сами числа, а не их рост.' }),
+  pipes: r => ({ p: { w: [4, 4, 5, 5, 5, 6, 6, 6][r], h: [3, 3, 3, 4, 4, 4, 4, 4][r] }, task: 'Почини трубы! 🚰 Крути кусочки, чтобы вода дотекла до цветочка.', hint: 'Нажимай на трубу — она поворачивается. Веди дорожку от крана слева к цветку справа!' }),
+  memory: r => ({ p: { len: [3, 4, 4, 5, 5, 6, 6, 7][r] }, task: 'Запомни, как мигают лампочки, и повтори!', hint: 'Проговаривай цвета вслух: «красный, синий…» — так легче запомнить!' }),
+  oddone: r => ({ p: { pair: ODD_PAIRS[r], cols: ODD_GRID[r][0], rows: ODD_GRID[r][1] }, task: 'Найди ЛИШНЕГО!', hint: 'Один из них чуть-чуть не такой, как все. Смотри внимательно на каждого!' }),
+  cats: r => ({ p: { count: [3, 4, 4, 5, 5, 6, 6, 7][r] }, task: 'Найди всех котиков! Их тут ' + [3, 4, 4, 5, 5, 6, 6, 7][r] + '…', hint: 'Некоторые прячутся ЗА мебелью — нажимай прямо на диван или коробку, где торчат ушки!' }),
+  count: r => ({ p: { k: [5, 6, 7, 8, 9, 10, 11, 12][r] }, task: 'Сколько уточек на картинке? 🦆', hint: 'Хитрые утки прячутся друг за другом! Считай клювики, а не жёлтые пятна.' }),
+  balance: r => ({ p: { target: [4, 6, 7, 8, 9, 10, 11, 11][r] }, task: 'Уравняй весы! Положи гирьки справа.', hint: 'Складывай числа на гирьках — сумма должна быть точно как на оранжевом ящике!' }),
+  mazefinger: r => ({ p: { variant: r % 3, tol: [34, 34, 30, 30, 28, 28, 26, 26][r], webs: [0, 1, 1, 2, 2, 3, 3, 4][r] }, task: r >= 1 ? 'Проведи жучка к звёздочке! Стенки и паутина 🕸️ — опасно!' : 'Проведи жучка к звёздочке! Не задень стенки!', hint: r >= 1 ? 'Паутинки надо аккуратно ОБЪЕЗЖАТЬ по краю дорожки — не спеши, как в Паучьем лабиринте!' : 'Веди пальцем МЕДЛЕННО от зелёного круга. Тише едешь — дальше будешь!' }),
+  sleepy: r => ({ p: {}, task: 'Разбуди соню! 😴', hint: 'Пёрышко щекочет, мегафон пугает соседей… А что звенит по утрам? Тащи его к уху!' }),
+  darkroom: r => ({ p: { dodges: Math.min(2 + r, 4) }, task: 'Ой, темно! Включи свет!', hint: 'Води пальцем по тёмной комнате как фонариком. Выключатель хитрый — убегает, но ты быстрее!' }),
+  vacuum: r => ({ p: { pos: ['right', 'left', 'hidden'][r], needBtn: r >= 1 }, task: 'Пылесос не работает! Почини его и убери пыль с ковра.', hint: r === 0 ? 'Кнопка не поможет — пылесосу нужно электричество! Возьми вилку шнура и тащи её вправо, к розетке на стене!' : (r === 1 ? 'Розетка переехала на ДРУГУЮ сторону! Воткни вилку и потом не забудь нажать кнопку включения!' : 'Розетки нигде нет?.. А что это висит на стене? Загляни ЗА КАРТИНУ! И после розетки нажми кнопку!') }),
+  magnet: r => ({ p: { n: [5, 6, 7, 8, 9, 10, 11, 12][r], boxes: [3, 4, 4, 5, 5, 5, 6, 6][r] }, task: 'Собери все винтики и гайки! Руками трогать НЕЛЬЗЯ — острые!', hint: 'Пальцем — ай, уколешься! Открой ящики внизу: в одном лежит МАГНИТ 🧲. Тащи его — железки сами прилипнут!' }),
+  onestroke: r => ({ p: { n: [4, 5, 6, 6, 7, 8, 9, 10][r], noCross: r >= 2 }, task: r >= 2 ? 'Проведи через ВСЕ точки, не отрывая палец! Линия не должна пересекаться!' : 'Проведи через ВСЕ точки, не отрывая палец от экрана!', hint: r >= 2 ? 'Сначала глазами придумай маршрут без перекрёстков — обычно надо идти по кругу!' : 'Начни с крайней точки и веди палец плавно от точки к точке. Оторвёшь — начнёшь заново!' }),
+};
+const RR = ['wires', 'icecream', 'tvroom', 'bignum', 'vacuum', 'pipes', 'memory', 'onestroke', 'oddone', 'cats', 'magnet', 'count', 'balance', 'mazefinger', 'sleepy', 'darkroom'];
+const CAPS = { wires: 8, icecream: 8, tvroom: 8, bignum: 8, vacuum: 3, pipes: 8, memory: 8, onestroke: 8, oddone: 8, cats: 8, magnet: 8, count: 8, balance: 8, mazefinger: 8, sleepy: 4, darkroom: 4 };
+const baseList = [];
+for (let r = 0; r < 8; r++) for (const t of RR) { if (r >= CAPS[t]) continue; const s = GEN[t](r); s.t = t; baseList.push(s); }
+// уровни-приколы вставляются в хитрых местах
+const TRICKS = [
+  { t: 'trick_bulb', task: 'Зажги зелёную лампочку!', hint: 'Эта серая лампа — обманка! А какая лампочка загорается, когда ты побеждаешь?.. 😉' },
+  { t: 'trick_math', task: 'Реши пример!', hint: 'Сначала умножение, потом сложение: 2×2=4, потом 2+4!' },
+  { t: 'trick_door', task: 'Открой дверь!', hint: 'Нажимать бесполезно! Возьми ручку и ПОТЯНИ её вниз.' },
+  { t: 'trick_pet', task: 'Погладь котика 5 раз!', hint: 'Погладить — это провести пальцем по котику туда-сюда. Он замурлычет!' },
+];
+baseList.splice(6, 0, TRICKS[0]); baseList.splice(24, 0, TRICKS[1]); baseList.splice(49, 0, TRICKS[2]); baseList.splice(74, 0, TRICKS[3]);
+baseList.forEach((s, i) => LEVELS.push({ t: s.t, task: s.task, hint: s.hint, p: s.p || {}, seed: i * 977 + 13 }));
+
+// секрет уровня-прикола: зелёная лампочка в шапке зажигается сама!
+el('greenBulb').addEventListener('pointerdown', () => { if (el('game').classList.contains('show') && LEVELS[cur] && LEVELS[cur].t === 'trick_bulb' && levelApi) levelApi.win(); });
+
+refreshHud();
+el('sndBtn').firstChild.textContent = S.sound ? '🔊' : '🔇';
+
+// отладочный хук для автотестов
+window.__dbg = {
+  S, LEVELS,
+  go(i) { startLevel(i); },
+  win() { levelApi && levelApi.win(); },
+  fail() { levelApi && levelApi.fail(); },
+  state() { return { cur, coins: S.coins, bulbs: S.bulbs, passed: Object.keys(S.passed).length, screen: el('game').classList.contains('show') ? 'game' : (el('menu').classList.contains('show') ? 'menu' : 'levels') }; },
+};
+</script>
+<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js');</script>
+</body>
+</html>
