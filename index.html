@@ -89,7 +89,7 @@
   .shopRow button{ padding:10px 16px; font-size:16px; font-weight:900; color:#3a2400; background:linear-gradient(180deg,#ffd856,#f5a623); border:none; border-radius:12px; box-shadow:0 4px 0 #b4771a; cursor:pointer; }
   .shopRow button:disabled{ filter:grayscale(1); opacity:.6; }
   .shopRow button:active{ transform:translateY(3px); box-shadow:none; }
-  #toast{ position:fixed; left:50%; bottom:84px; transform:translateX(-50%); background:#1b2333; color:#fff; font-weight:800; padding:12px 20px; border-radius:999px; z-index:60; display:none; box-shadow:0 8px 30px rgba(0,0,0,.35); max-width:86vw; text-align:center; }
+  #toast{ position:fixed; left:50%; bottom:84px; transform:translateX(-50%); background:#1b2333; color:#fff; font-weight:800; padding:12px 20px; border-radius:999px; z-index:60; display:none; box-shadow:0 8px 30px rgba(0,0,0,.35); max-width:86vw; text-align:center; pointer-events:none; }
   .xClose{ position:absolute; top:10px; right:12px; background:none; border:none; color:#8b97a6; font-size:26px; cursor:pointer; }
   .cardWrap{ position:relative; }
 </style>
@@ -705,6 +705,33 @@ TYPES.pipes = { build(svg, p, api) {
     g.addEventListener('pointerdown', () => { t.dirs = t.dirs.map(rotDir); drawPipe(t); sndClick(); setTimeout(check, 60); });
     tiles.push(t);
   }
+  // 💦 сломанные трубы (заказ Марка 18.07): вода в них ВЫТЕКАЕТ — строить путь через них нельзя!
+  const nBroken = p.broken || 0;
+  if (nBroken) {
+    const cand = shuffle(tiles.filter(t => !cells.has(t.cx + ',' + t.cy)), rng);
+    for (let i = 0; i < nBroken && i < cand.length; i++) {
+      const t = cand[i]; t.broken = true;
+      const cg = svgEl('g', {}, t.g);
+      svgEl('path', { d: 'M' + (-CS * 0.2) + ',' + (-CS * 0.16) + ' l' + (CS * 0.13) + ',' + (CS * 0.1) + ' l' + (-CS * 0.07) + ',' + (CS * 0.11) + ' l' + (CS * 0.15) + ',' + (CS * 0.1), stroke: '#26313f', 'stroke-width': 3, fill: 'none', 'stroke-linecap': 'round' }, cg);
+      t.dropT = svgEl('text', { x: CS * 0.18, y: CS * 0.34, 'font-size': Math.max(14, Math.round(CS * 0.26)), 'text-anchor': 'middle' }, cg);
+      t.dropT.textContent = '💧';
+    }
+    // страховка: вдруг вода с самого старта уже течёт в сломанную — крутанём её
+    for (let s = 0; s < 6; s++) { const bad = walkHitsBroken(); if (!bad) break; bad.dirs = bad.dirs.map(rotDir); drawPipe(bad); }
+  }
+  function walkHitsBroken() {
+    let cx = 0, cy = sr, from = 'W';
+    for (let steps = 0; steps < W * H + 2; steps++) {
+      const t = tileAt(cx, cy);
+      if (!t || !t.dirs.includes(from)) return null;
+      if (t.broken) return t;
+      const out = t.dirs.find(d => d !== from);
+      if (out === 'E' && cx === W - 1) return null;
+      cx += DIRS[out][0]; cy += DIRS[out][1]; from = OPP[out];
+      if (cx < 0 || cy < 0 || cx >= W || cy >= H) return null;
+    }
+    return null;
+  }
   function drawPipe(t, water) {
     t.pg.innerHTML = '';
     const col = water ? '#3b9bff' : '#9aa7b5';
@@ -718,6 +745,14 @@ TYPES.pipes = { build(svg, p, api) {
     for (let steps = 0; steps < W * H + 2; steps++) {
       const t = tileAt(cx, cy);
       if (!t || !t.dirs.includes(from)) return;
+      if (t.broken) { // вода дошла до трещины — ВЫТЕКАЕТ! (заказ Марка)
+        wet.forEach(w => drawPipe(w, true));
+        if (t.dropT) t.dropT.textContent = '💦';
+        svgEl('ellipse', { cx: 0, cy: CS * 0.36, rx: CS * 0.32, ry: CS * 0.1, fill: '#3b9bff', opacity: 0.8 }, t.g);
+        toast('Труба СЛОМАНА! 💦 Вода вытекла, цветок остался сухой…');
+        setTimeout(() => api.fail(), 700);
+        return;
+      }
       const out = t.dirs.find(d => d !== from);
       wet.push(t);
       if (out === 'E' && cx === W - 1) {
@@ -733,22 +768,50 @@ TYPES.pipes = { build(svg, p, api) {
 // ---------- 🐱 НАЙДИ КОТИКОВ ----------
 TYPES.cats = { build(svg, p, api) {
   const need = p.count || 4, rng = api.rng;
+  const inBoxes = Math.min(p.boxes || 0, need), freeCats = need - inBoxes;
   const catPos = [];
-  for (let i = 0; i < need; i++) catPos.push({ x: 90 + rng() * 620, y: 210 + rng() * 300, found: false });
+  for (let i = 0; i < freeCats; i++) catPos.push({ x: 90 + rng() * 620, y: 210 + rng() * (inBoxes ? 220 : 300), found: false });
   const catsG = svgEl('g', {}, svg);
   catPos.forEach(c => { const t = svgEl('text', { x: c.x, y: c.y, 'text-anchor': 'middle', 'font-size': 40 }, catsG); t.textContent = '🐱'; c.node = t; });
   // мебель ПОВЕРХ котов — прячет половину
   const furn = ['🛋️', '📦', '🌳', '🪴', '🗄️', '🧺'];
   catPos.forEach((c, i) => { if (i % 2 === 0) { const f = svgEl('text', { x: c.x + 6, y: c.y + 26, 'text-anchor': 'middle', 'font-size': 58 }, svg); f.textContent = furn[Math.floor(rng() * furn.length)]; f.style.pointerEvents = 'none'; } });
-  for (let i = 0; i < 5; i++) { const f = svgEl('text', { x: 100 + rng() * 600, y: 220 + rng() * 290, 'text-anchor': 'middle', 'font-size': 52 }, svg); f.textContent = furn[Math.floor(rng() * furn.length)]; f.style.pointerEvents = 'none'; }
+  for (let i = 0; i < 5; i++) { const f = svgEl('text', { x: 100 + rng() * 600, y: 220 + rng() * (inBoxes ? 210 : 290), 'text-anchor': 'middle', 'font-size': 52 }, svg); f.textContent = furn[Math.floor(rng() * furn.length)]; f.style.pointerEvents = 'none'; }
   let found = 0;
   const counter = svgEl('text', { x: 400, y: 165, 'text-anchor': 'middle', 'font-size': 28, 'font-weight': 900, fill: '#8b97a6' }, svg);
   counter.textContent = '🐱 0 / ' + need;
+  function gotCat(x, y) { found++; sndCoin(); svgEl('text', { x: x + 20, y: y - 28, 'font-size': 26 }, svg).textContent = '✅'; counter.textContent = '🐱 ' + found + ' / ' + need; if (found >= need) setTimeout(() => api.win(), 350); }
+  // 📦 коты ВНУТРИ ящиков (заказ Марка 18.07): открывай дверцы!
+  if (inBoxes) {
+    const nb = inBoxes + 2; // плюс пустые ящики-обманки
+    const catBoxSet = new Set(shuffle([...Array(nb).keys()], rng).slice(0, inBoxes));
+    const decors = ['🧦', '🧸', '🥫', '🕸️'];
+    for (let i = 0; i < nb; i++) {
+      const bx = 110 + i * (580 / Math.max(1, nb - 1)), by = 500;
+      const g = svgEl('g', { transform: 'translate(' + bx + ',' + by + ')', cursor: 'pointer' }, svg);
+      svgEl('rect', { x: -44, y: -30, width: 88, height: 60, rx: 9, fill: '#8a5a2b', stroke: '#5f3d1c', 'stroke-width': 3 }, g);
+      const inner = svgEl('g', {}, g);
+      const lid = svgEl('rect', { x: -44, y: -42, width: 88, height: 18, rx: 6, fill: '#a5713d', stroke: '#5f3d1c', 'stroke-width': 3 }, g);
+      let opened = false;
+      g.addEventListener('pointerdown', ev => {
+        if (opened) return;
+        ev.stopPropagation();
+        opened = true; sndClick();
+        lid.style.transition = 'transform .3s'; lid.style.transformOrigin = '-44px -42px'; lid.setAttribute('transform', 'rotate(-70)');
+        if (catBoxSet.has(i)) {
+          const ct = svgEl('text', { x: 0, y: -34, 'text-anchor': 'middle', 'font-size': 40 }, g); ct.textContent = '🐱';
+          ct.animate([{ transform: 'translateY(26px)' }, { transform: 'translateY(0px)' }], { duration: 300 });
+          toast('Мяу! 🐱 Вот ты где!');
+          gotCat(bx, by - 30);
+        } else { const t = svgEl('text', { x: 0, y: 4, 'text-anchor': 'middle', 'font-size': 26 }, inner); t.textContent = decors[Math.floor(rng() * decors.length)]; }
+      });
+    }
+  }
   svg.addEventListener('pointerdown', ev => {
     const pt = svgPt(svg, ev);
     for (const c of catPos) {
       if (c.found) continue;
-      if (Math.hypot(pt.x - c.x, pt.y - c.y + 12) < 34) { c.found = true; found++; sndCoin(); svgEl('text', { x: c.x + 20, y: c.y - 28, 'font-size': 26 }, svg).textContent = '✅'; counter.textContent = '🐱 ' + found + ' / ' + need; if (found >= need) api.win(); return; }
+      if (Math.hypot(pt.x - c.x, pt.y - c.y + 12) < 34) { c.found = true; gotCat(c.x, c.y); return; }
     }
   });
 } };
@@ -856,12 +919,37 @@ TYPES.sleepy = { build(svg, p, api) {
   svgEl('path', { d: 'M-84,-4 q6,7 12,0', stroke: '#4d3630', 'stroke-width': 4, fill: 'none', 'stroke-linecap': 'round' }, cat);
   svgEl('path', { d: 'M96,44 q34,-8 22,-38', stroke: '#8d6e63', 'stroke-width': 18, fill: 'none', 'stroke-linecap': 'round' }, cat);
   const zzz = svgEl('text', { x: -40, y: -90, 'font-size': 38 }, cat); zzz.textContent = '💤';
-  const items = [ { e: '🪶', msg: 'Хи-хи! Щекотно… но он спит дальше!' }, { e: '⏰', win: true }, { e: '📣', msg: 'Тише! Соседи заругаются! 🙉' } ];
-  const objs = items.map((it, i) => {
-    const x = 180 + i * 220, y = 505;
+  const r = p.r || 0, rng = api.rng;
+  const objs = [];
+  function addObj(it, x, y) {
     const t = svgEl('text', { x: 0, y: 0, 'text-anchor': 'middle', 'font-size': 52, cursor: 'grab', transform: 'translate(' + x + ',' + y + ')' }, svg); t.textContent = it.e;
-    return { t, it, hx: x, hy: y, x, y };
-  });
+    const o = { t, it, hx: x, hy: y, x, y }; objs.push(o); return o;
+  }
+  if (r < 4) {
+    // классика: будильник на виду
+    [ { e: '🪶', msg: 'Хи-хи! Щекотно… но он спит дальше!' }, { e: '⏰', win: true, snd: 'alarm' }, { e: '📣', msg: 'Тише! Соседи заругаются! 🙉' } ].forEach((it, i) => addObj(it, 180 + i * 220, 505));
+  } else {
+    // 😴 усложнение (заказ Марка 18.07): на виду ТОЛЬКО обманки, будилка спрятана в ящике!
+    const wake = r === 4 ? { e: '🐓', win: true, snd: 'rooster' } : { e: '🥁', win: true, snd: 'drum' };
+    [ { e: '🪶', msg: 'Хи-хи! Щекотно… но он спит дальше!' }, { e: '📣', msg: 'Тише! Соседи заругаются! 🙉' }, { e: '🧦', msg: 'Фу-у, носок! Соня только нос закрыл 🤭' } ].forEach((it, i) => addObj(it, 120 + i * 130, 505));
+    const nb = 3, wakeIdx = Math.floor(rng() * nb), decors = ['🧸', '🪀', '🥫'];
+    for (let i = 0; i < nb; i++) {
+      const bx = 540 + i * 112, by = 500;
+      const g = svgEl('g', { transform: 'translate(' + bx + ',' + by + ')', cursor: 'pointer' }, svg);
+      svgEl('rect', { x: -44, y: -30, width: 88, height: 60, rx: 9, fill: '#8a5a2b', stroke: '#5f3d1c', 'stroke-width': 3 }, g);
+      const inner = svgEl('g', {}, g);
+      const lid = svgEl('rect', { x: -44, y: -42, width: 88, height: 18, rx: 6, fill: '#a5713d', stroke: '#5f3d1c', 'stroke-width': 3 }, g);
+      let opened = false;
+      g.addEventListener('pointerdown', ev => {
+        if (opened) return;
+        ev.stopPropagation();
+        opened = true; sndClick();
+        lid.style.transition = 'transform .3s'; lid.style.transformOrigin = '-44px -42px'; lid.setAttribute('transform', 'rotate(-70)');
+        if (i === wakeIdx) { addObj(wake, bx, by - 34); toast(r === 4 ? 'ПЕТУХ! 🐓 Вот кто умеет будить — неси его к уху!' : 'БАРАБАН! 🥁 Громче не бывает — неси его к уху!'); }
+        else { const t = svgEl('text', { x: 0, y: 4, 'text-anchor': 'middle', 'font-size': 26 }, inner); t.textContent = decors[Math.floor(rng() * decors.length)]; }
+      });
+    }
+  }
   let drag = null;
   svg.addEventListener('pointerdown', ev => { const pt = svgPt(svg, ev); for (const o of objs) { if (Math.hypot(pt.x - o.x, pt.y - o.y + 18) < 46) { drag = o; ev.preventDefault(); return; } } });
   api.on(window, 'pointermove', ev => { if (!drag) return; const pt = svgPt(svg, ev); drag.x = pt.x; drag.y = pt.y; drag.t.setAttribute('transform', 'translate(' + pt.x + ',' + pt.y + ')'); });
@@ -870,7 +958,12 @@ TYPES.sleepy = { build(svg, p, api) {
     const nearCat = Math.hypot(drag.x - 320, drag.y - 268) < 150;
     if (nearCat) {
       if (drag.it.win) {
-        if (actx && S.sound) { const t0 = actx.currentTime; for (let i = 0; i < 6; i++) blip(1400, 0.07, 'square', 0.1, t0 + i * 0.09); }
+        if (actx && S.sound) {
+          const t0 = actx.currentTime;
+          if (drag.it.snd === 'rooster') [660, 880, 780, 1100].forEach((f, i) => blip(f, 0.16, 'square', 0.1, t0 + i * 0.16)); // ку-ка-ре-ку!
+          else if (drag.it.snd === 'drum') for (let i = 0; i < 4; i++) blip(130, 0.18, 'sine', 0.22, t0 + i * 0.2); // бум-бум-бум!
+          else for (let i = 0; i < 6; i++) blip(1400, 0.07, 'square', 0.1, t0 + i * 0.09);
+        }
         zzz.textContent = '❗'; svgEl('path', { d: 'M-98,-30 q8,-10 16,0 M-74,-30 q8,-10 16,0', stroke: '#1b1b1b', 'stroke-width': 4, fill: 'none' }, cat);
         setTimeout(() => api.win(), 600);
       } else { toast(drag.it.msg); }
@@ -937,7 +1030,7 @@ TYPES.mazefinger = { build(svg, p, api) {
 // ---------- 🧹 ВКЛЮЧИ ПЫЛЕСОС (идея Марка!) ----------
 TYPES.vacuum = { build(svg, p, api) {
   const rng = api.rng;
-  const pos = p.pos || 'right', needBtn = !!p.needBtn;
+  const pos = p.pos || 'right', needBtn = !!p.needBtn, closet = pos === 'closet'; // closet — супер-версия (заказ Марка 18.07)
   // комната: стена + пол
   svgEl('rect', { x: 0, y: 0, width: 800, height: 330, fill: '#eaf2fb' }, svg);
   svgEl('rect', { x: 0, y: 330, width: 800, height: 230, fill: '#c9a06a' }, svg);
@@ -946,34 +1039,58 @@ TYPES.vacuum = { build(svg, p, api) {
   const carpet = svgEl('g', { transform: 'translate(400,455)' }, svg);
   svgEl('rect', { x: -240, y: -75, width: 480, height: 150, rx: 14, fill: '#9c1717', stroke: '#e3b23c', 'stroke-width': 7 }, carpet);
   for (let i = -1; i <= 1; i++) { svgEl('path', { d: 'M' + (i * 120 - 30) + ',0 L' + (i * 120) + ',-38 L' + (i * 120 + 30) + ',0 L' + (i * 120) + ',38 Z', fill: 'none', stroke: '#e3b23c', 'stroke-width': 4 }, carpet); svgEl('circle', { cx: i * 120, cy: 0, r: 8, fill: '#e3b23c' }, carpet); }
-  // пыль на ковре
+  // пыль на ковре (в супер-уровне ковёр совсем пыльный!)
   const dust = [];
-  for (let i = 0; i < 6; i++) { const d = svgEl('circle', { cx: 400 - 190 + rng() * 380, cy: 415 + rng() * 80, r: 5 + rng() * 5, fill: '#8b97a6', opacity: 0.75 }, svg); dust.push(d); }
+  for (let i = 0; i < (closet ? 10 : 6); i++) { const d = svgEl('circle', { cx: 400 - 190 + rng() * 380, cy: 415 + rng() * 80, r: 5 + rng() * 5, fill: '#8b97a6', opacity: 0.75 }, svg); dust.push(d); }
   // где розетка? (каждый раз в новом месте!)
-  const sockX = pos === 'right' ? 700 : (pos === 'left' ? 100 : 620);
-  const sockY = pos === 'hidden' ? 160 : 300;
-  let sockOpen = (pos !== 'hidden'); // за картиной — пока закрыта
+  const PIC_XS = [280, 460, 640];
+  const goodPic = closet ? Math.floor(rng() * 3) : -1; // за какой картиной прячется розетка
+  const sockX = closet ? PIC_XS[goodPic] : (pos === 'right' ? 700 : (pos === 'left' ? 100 : 620));
+  const sockY = (pos === 'hidden' || closet) ? 160 : 300;
+  let sockOpen = (pos !== 'hidden' && !closet); // за картиной — пока закрыта
   const sock = svgEl('g', { transform: 'translate(' + sockX + ',' + sockY + ')', visibility: sockOpen ? 'visible' : 'hidden' }, svg);
   svgEl('rect', { x: -20, y: -24, width: 40, height: 48, rx: 8, fill: '#f2f5f9', stroke: '#8b97a6', 'stroke-width': 3.5 }, sock);
   svgEl('circle', { cx: -6, cy: 0, r: 3.4, fill: '#26313f' }, sock);
   svgEl('circle', { cx: 6, cy: 0, r: 3.4, fill: '#26313f' }, sock);
-  // картина: обычно просто украшение, но в хитром уровне ЗА НЕЙ розетка!
-  const picX = pos === 'hidden' ? sockX : (pos === 'left' ? 620 : 135);
-  const picY = pos === 'hidden' ? sockY : 132;
-  const pic = svgEl('g', { transform: 'translate(' + picX + ',' + picY + ')', cursor: pos === 'hidden' ? 'pointer' : 'default' }, svg);
-  svgEl('rect', { x: -55, y: -42, width: 110, height: 84, rx: 6, fill: '#fff', stroke: '#8b97a6', 'stroke-width': 5 }, pic);
-  svgEl('text', { x: 0, y: 13, 'text-anchor': 'middle', 'font-size': 40 }, pic).textContent = '🌄';
-  if (pos === 'hidden') pic.addEventListener('pointerdown', ev => {
-    ev.stopPropagation(); if (sockOpen) return; sockOpen = true; sndClick();
-    pic.style.transition = 'transform .55s'; pic.setAttribute('transform', 'translate(' + picX + ',' + (picY + 150) + ') rotate(-14)');
-    setTimeout(() => { pic.style.opacity = 0.55; }, 400);
-    sock.setAttribute('visibility', 'visible');
-    toast('Ого! За картиной РОЗЕТКА! 🔌');
-  });
-  // пылесос
-  const vx = pos === 'left' ? 535 : 265, vy = 360;
+  // картины: украшение… или ЗА НЕЙ розетка! (в супер-уровне картин ТРИ — угадай, за какой)
+  function makePic(px, py, canOpen, hasSock, art) {
+    const pic = svgEl('g', { transform: 'translate(' + px + ',' + py + ')', cursor: canOpen ? 'pointer' : 'default' }, svg);
+    svgEl('rect', { x: -55, y: -42, width: 110, height: 84, rx: 6, fill: '#fff', stroke: '#8b97a6', 'stroke-width': 5 }, pic);
+    svgEl('text', { x: 0, y: 13, 'text-anchor': 'middle', 'font-size': 40 }, pic).textContent = art;
+    let done = false;
+    if (canOpen) pic.addEventListener('pointerdown', ev => {
+      ev.stopPropagation(); if (done) return; done = true; sndClick();
+      pic.style.transition = 'transform .55s'; pic.setAttribute('transform', 'translate(' + px + ',' + (py + 150) + ') rotate(-14)');
+      setTimeout(() => { pic.style.opacity = 0.55; }, 400);
+      if (hasSock) { sockOpen = true; sock.setAttribute('visibility', 'visible'); toast('Ого! За картиной РОЗЕТКА! 🔌'); }
+      else toast('Пусто… только пыльная стена 🕸️');
+    });
+  }
+  if (closet) { const arts = ['🌄', '⛵', '🐟']; PIC_XS.forEach((px, i) => makePic(px, 160, true, i === goodPic, arts[i])); }
+  else if (pos === 'hidden') makePic(sockX, sockY, true, true, '🌄');
+  else makePic(pos === 'left' ? 620 : 135, 132, false, false, '🌄');
+  // пылесос (в супер-уровне спрятан в ШКАФУ — сначала вытащи его на ковёр!)
+  let vx = closet ? 92 : (pos === 'left' ? 535 : 265), vy = closet ? 292 : 360;
   const mir = pos === 'left' ? -1 : 1; // куда смотрит шнур
-  const vac = svgEl('g', { transform: 'translate(' + vx + ',' + vy + ')' }, svg);
+  let placed = !closet, closetOpen = false;
+  if (closet) {
+    const wg = svgEl('g', { transform: 'translate(92,235)', cursor: 'pointer' }, svg);
+    svgEl('rect', { x: -78, y: -135, width: 156, height: 270, rx: 10, fill: '#8a5a2b', stroke: '#5f3d1c', 'stroke-width': 5 }, wg);
+    svgEl('rect', { x: -70, y: -148, width: 140, height: 16, rx: 6, fill: '#a5713d', stroke: '#5f3d1c', 'stroke-width': 3 }, wg);
+    const dl = svgEl('g', {}, wg), dr = svgEl('g', {}, wg);
+    svgEl('rect', { x: -72, y: -128, width: 70, height: 256, rx: 7, fill: '#a5713d', stroke: '#5f3d1c', 'stroke-width': 3.5 }, dl);
+    svgEl('circle', { cx: -12, cy: 0, r: 5, fill: '#5c3a15' }, dl);
+    svgEl('rect', { x: 2, y: -128, width: 70, height: 256, rx: 7, fill: '#a5713d', stroke: '#5f3d1c', 'stroke-width': 3.5 }, dr);
+    svgEl('circle', { cx: 12, cy: 0, r: 5, fill: '#5c3a15' }, dr);
+    wg.addEventListener('pointerdown', ev => {
+      if (closetOpen) return; ev.stopPropagation(); closetOpen = true; sndClick();
+      dl.style.transition = 'transform .4s'; dl.style.transformOrigin = '-72px 0px'; dl.setAttribute('transform', 'scale(0.18,1)');
+      dr.style.transition = 'transform .4s'; dr.style.transformOrigin = '72px 0px'; dr.setAttribute('transform', 'scale(0.18,1)');
+      vac.setAttribute('visibility', 'visible'); // пылесос показался в открытом шкафу
+      toast('Вот он где! 🧹 Тащи пылесос на ковёр!');
+    });
+  }
+  const vac = svgEl('g', { transform: 'translate(' + vx + ',' + vy + ')' + (closet ? ' scale(0.72)' : ''), visibility: closet ? 'hidden' : 'visible' }, svg);
   svgEl('ellipse', { cx: 0, cy: 26, rx: 22, ry: 8, fill: 'rgba(0,0,0,.18)' }, vac);
   svgEl('path', { d: 'M-52,18 a52,44 0 0 1 104,0 z', fill: '#3b9bff', stroke: '#1d5ba8', 'stroke-width': 4 }, vac);
   svgEl('rect', { x: -52, y: 14, width: 104, height: 14, rx: 7, fill: '#2f7fe0', stroke: '#1d5ba8', 'stroke-width': 3 }, vac);
@@ -984,10 +1101,10 @@ TYPES.vacuum = { build(svg, p, api) {
   svgEl('circle', { cx: -12, cy: -10, r: 2.4, fill: '#26313f' }, vac); svgEl('circle', { cx: 12, cy: -10, r: 2.4, fill: '#26313f' }, vac);
   // кнопка
   const btn = svgEl('circle', { cx: 0, cy: 6, r: 11, fill: '#ff5252', stroke: '#a82626', 'stroke-width': 3, cursor: 'pointer' }, vac);
-  // шнур и вилка (mir = в какую сторону тянется шнур)
+  // шнур и вилка (mir = в какую сторону тянется шнур); в шкафном уровне появляются после установки
   let plugX = vx + 88 * mir, plugY = 420, plugged = false, presses = 0, running = false;
-  const cord = svgEl('path', { d: '', stroke: '#26313f', 'stroke-width': 6, fill: 'none', 'stroke-linecap': 'round' }, svg);
-  const plug = svgEl('g', { cursor: 'grab' }, svg);
+  const cord = svgEl('path', { d: '', stroke: '#26313f', 'stroke-width': 6, fill: 'none', 'stroke-linecap': 'round', visibility: placed ? 'visible' : 'hidden' }, svg);
+  const plug = svgEl('g', { cursor: 'grab', visibility: placed ? 'visible' : 'hidden' }, svg);
   svgEl('rect', { x: -16, y: -12, width: 28, height: 24, rx: 7, fill: '#26313f' }, plug);
   svgEl('rect', { x: 12, y: -8, width: 14, height: 5, rx: 2.5, fill: '#c9a44a' }, plug);
   svgEl('rect', { x: 12, y: 3, width: 14, height: 5, rx: 2.5, fill: '#c9a44a' }, plug);
@@ -1008,6 +1125,7 @@ TYPES.vacuum = { build(svg, p, api) {
     setTimeout(() => api.win(), 1400);
   }
   btn.addEventListener('pointerdown', ev => {
+    if (!placed) return; // пока пылесос в шкафу — клик проходит дальше, чтобы тащить его целиком
     ev.stopPropagation();
     if (running) return;
     if (plugged) { if (needBtn) { sndClick(); startMotor(); } return; }
@@ -1015,8 +1133,28 @@ TYPES.vacuum = { build(svg, p, api) {
     vac.animate([{ transform: 'translate(' + (vx - 3) + 'px,' + vy + 'px)' }, { transform: 'translate(' + (vx + 3) + 'px,' + vy + 'px)' }, { transform: 'translate(' + vx + 'px,' + vy + 'px)' }], { duration: 200 });
     toast(presses < 2 ? 'Пшш… Тишина. Не включается! 🤔' : 'Хм… А откуда пылесосу взять электричество? ⚡');
   });
+  // перетаскивание пылесоса из шкафа на ковёр (супер-уровень)
+  function setVac() { vac.setAttribute('transform', 'translate(' + vx + ',' + vy + ')' + (placed ? '' : ' scale(0.72)')); }
+  let dragV = false;
+  if (closet) {
+    svg.addEventListener('pointerdown', ev => {
+      if (placed || !closetOpen) return;
+      const pt = svgPt(svg, ev);
+      if (Math.hypot(pt.x - vx, pt.y - vy) < 75) { dragV = true; ev.preventDefault(); }
+    });
+    api.on(window, 'pointermove', ev => { if (!dragV) return; const pt = svgPt(svg, ev); vx = pt.x; vy = pt.y; setVac(); });
+    api.on(window, 'pointerup', () => {
+      if (!dragV) return; dragV = false;
+      if (vy > 345 && vx > 200 && vx < 620) { // поставил на ковёр!
+        placed = true; vy = 360; vx = Math.max(250, Math.min(560, vx)); setVac();
+        plugX = vx + 88 * mir; plugY = 420;
+        cord.setAttribute('visibility', 'visible'); plug.setAttribute('visibility', 'visible'); drawCord();
+        sndCoin(); toast('Пылесос на месте! А где розетка?.. 🤔');
+      } else { vx = 92; vy = 292; setVac(); } // не донёс — вернулся в шкаф
+    });
+  }
   let dragP = false;
-  svg.addEventListener('pointerdown', ev => { const pt = svgPt(svg, ev); if (!plugged && Math.hypot(pt.x - plugX, pt.y - plugY) < 42) { dragP = true; ev.preventDefault(); } });
+  svg.addEventListener('pointerdown', ev => { const pt = svgPt(svg, ev); if (placed && !plugged && Math.hypot(pt.x - plugX, pt.y - plugY) < 42) { dragP = true; ev.preventDefault(); } });
   api.on(window, 'pointermove', ev => { if (!dragP) return; const pt = svgPt(svg, ev); plugX = pt.x; plugY = pt.y; drawCord(); });
   api.on(window, 'pointerup', () => {
     if (!dragP) return; dragP = false;
@@ -1104,6 +1242,14 @@ TYPES.magnet = { build(svg, p, api) {
       screws.push({ x, y, node: t, stuck: false });
     }
   }
+  // 🟤 РЖАВЫЕ гайки (заказ Марка 18.07): 1-е касание магнитом — предупреждение, 2-е — красная лампа!
+  const nRust = Math.min(p.rust || 0, Math.max(0, screws.length - 2));
+  if (nRust) shuffle([...Array(screws.length).keys()], rng).slice(0, nRust).forEach(i => {
+    const s = screws[i]; s.rust = true;
+    s.node.style.filter = 'sepia(1) saturate(4) hue-rotate(-25deg) brightness(.72)';
+  });
+  const cleanN = screws.filter(s => !s.rust).length;
+  let rustWarned = false;
   // ящики внизу — в одном из них магнит!
   const magnetIdx = Math.floor(rng() * nb);
   const decors = ['🧸', '🧦', '🥄', '🎲', '🧵'];
@@ -1116,8 +1262,9 @@ TYPES.magnet = { build(svg, p, api) {
     const lid = svgEl('rect', { x: -48, y: -42, width: 96, height: 18, rx: 6, fill: '#a5713d', stroke: '#5f3d1c', 'stroke-width': 3 }, g);
     let opened = false;
     g.addEventListener('pointerdown', ev => {
+      if (opened) return;
       ev.stopPropagation();
-      if (opened) return; opened = true; sndClick();
+      opened = true; sndClick();
       lid.style.transition = 'transform .3s'; lid.style.transformOrigin = '-48px -42px'; lid.setAttribute('transform', 'rotate(-70)');
       if (i === magnetIdx) {
         magX = bx; magY = by - 8;
@@ -1128,7 +1275,7 @@ TYPES.magnet = { build(svg, p, api) {
     });
   }
   const counter = svgEl('text', { x: 400, y: 165, 'text-anchor': 'middle', 'font-size': 26, 'font-weight': 900, fill: '#8b97a6' }, svg);
-  function setC() { counter.textContent = '🔩 ' + screws.filter(s => s.stuck).length + ' / ' + n; }
+  function setC() { counter.textContent = '🔩 ' + screws.filter(s => s.stuck).length + ' / ' + cleanN; }
   setC();
   let dragM = false, warned = false;
   svg.addEventListener('pointerdown', ev => {
@@ -1146,14 +1293,310 @@ TYPES.magnet = { build(svg, p, api) {
     if (!dragM) return; const pt = svgPt(svg, ev);
     magX = pt.x; magY = pt.y;
     magnet.setAttribute('transform', 'translate(' + magX + ',' + magY + ')');
+    // 🟤 ржавые: магнит их НЕ берёт, а трогать — беда (заказ Марка 18.07)
+    for (const s of screws) {
+      if (!s.rust) continue;
+      const near = Math.hypot(magX - s.x, magY - s.y) < 64;
+      if (near && !s.touch) {
+        s.touch = true;
+        if (!rustWarned) { rustWarned = true; blip(200, 0.3, 'sawtooth', 0.09); toast('Фу-у, РЖАВАЯ! 🟤 Такой гайкой никто пользоваться не будет! Обходи её!'); }
+        else { dragM = false; toast('Опять ржавая! 🟤 Так дело не пойдёт…'); api.fail(); return; }
+      } else if (!near) s.touch = false;
+    }
     let k = 0;
     for (const s of screws) {
+      if (s.rust) continue;
       if (!s.stuck && Math.hypot(magX - s.x, magY - s.y) < 72) { s.stuck = true; blip(900 + k * 80, 0.08, 'triangle', 0.1); setC(); }
       if (s.stuck) { const a = (screws.indexOf(s) / n) * Math.PI * 2; const nx = magX + Math.cos(a) * 30, ny = magY + 26 + Math.sin(a) * 12; s.node.setAttribute('x', nx); s.node.setAttribute('y', ny); s.node.setAttribute('transform', 'rotate(0 0 0)'); k++; }
     }
-    if (screws.every(s => s.stuck)) { dragM = false; setTimeout(() => api.win(), 350); }
+    if (screws.every(s => s.rust || s.stuck)) { dragM = false; setTimeout(() => api.win(), 350); }
   });
   api.on(window, 'pointerup', () => { dragM = false; });
+} };
+
+// ---------- ⚡ ВКЛЮЧИ ВСЕ ПРИБОРЫ (идея Марка 18.07!) ----------
+TYPES.appliances = { build(svg, p, api) {
+  const rng = api.rng, nb = p.boxes || 4, needBtn = !!p.needBtn;
+  // комната
+  svgEl('rect', { x: 0, y: 0, width: 800, height: 340, fill: '#eef4fb' }, svg);
+  svgEl('rect', { x: 0, y: 340, width: 800, height: 220, fill: '#c9a06a' }, svg);
+  svgEl('rect', { x: 0, y: 340, width: 800, height: 10, fill: '#a87f4c' }, svg);
+  let lampOn = false, tvOn = false, vacOn = false, tvPlugged = false, vacPlugged = false, adapterInstalled = false, won = false;
+  function checkWin() { if (!won && lampOn && tvOn && vacOn) { won = true; setTimeout(() => api.win(), 500); } }
+  // 💡 люстра (питается от проводки — включается выключателем!)
+  svgEl('line', { x1: 400, y1: 0, x2: 400, y2: 52, stroke: '#64798e', 'stroke-width': 5 }, svg);
+  const cone = svgEl('polygon', { points: '368,118 432,118 500,340 300,340', fill: '#ffd23b', opacity: 0 }, svg);
+  const glow = svgEl('circle', { cx: 400, cy: 102, r: 34, fill: '#ffd23b', opacity: 0 }, svg);
+  svgEl('path', { d: 'M362,90 L400,52 L438,90 Z', fill: '#f5a623', stroke: '#b4771a', 'stroke-width': 3 }, svg);
+  const bulb = svgEl('circle', { cx: 400, cy: 102, r: 15, fill: '#9aa7b5', stroke: '#64798e', 'stroke-width': 3 }, svg);
+  const lampOk = svgEl('text', { x: 448, y: 80, 'font-size': 26, visibility: 'hidden' }, svg); lampOk.textContent = '✅';
+  // выключатель на стене
+  const sw = svgEl('g', { transform: 'translate(120,230)', cursor: 'pointer' }, svg);
+  svgEl('rect', { x: -22, y: -34, width: 44, height: 68, rx: 8, fill: '#f2f5f9', stroke: '#8b97a6', 'stroke-width': 3 }, sw);
+  const swT = svgEl('rect', { x: -10, y: -4, width: 20, height: 26, rx: 5, fill: '#ff5252' }, sw);
+  sw.addEventListener('pointerdown', ev => {
+    ev.stopPropagation(); sndClick(); lampOn = !lampOn;
+    swT.setAttribute('fill', lampOn ? '#3ecf5e' : '#ff5252'); swT.setAttribute('y', lampOn ? -30 : -4);
+    bulb.setAttribute('fill', lampOn ? '#ffd23b' : '#9aa7b5');
+    glow.setAttribute('opacity', lampOn ? 0.4 : 0); cone.setAttribute('opacity', lampOn ? 0.13 : 0);
+    lampOk.setAttribute('visibility', lampOn ? 'visible' : 'hidden');
+    if (lampOn) blip(880, 0.12, 'square', 0.08);
+    checkWin();
+  });
+  // розетка — ОДНА на всю комнату!
+  const sockX = 400, sockY = 288;
+  const sock = svgEl('g', { transform: 'translate(' + sockX + ',' + sockY + ')' }, svg);
+  svgEl('rect', { x: -20, y: -24, width: 40, height: 48, rx: 8, fill: '#f2f5f9', stroke: '#8b97a6', 'stroke-width': 3.5 }, sock);
+  svgEl('circle', { cx: -6, cy: 0, r: 3.4, fill: '#26313f' }, sock);
+  svgEl('circle', { cx: 6, cy: 0, r: 3.4, fill: '#26313f' }, sock);
+  // 📺 телевизор на тумбе
+  const tvG = svgEl('g', { transform: 'translate(620,235)' }, svg);
+  svgEl('rect', { x: -88, y: -58, width: 176, height: 116, rx: 10, fill: '#26313f' }, tvG);
+  const tvScr = svgEl('rect', { x: -78, y: -48, width: 156, height: 96, rx: 5, fill: '#0b0f16' }, tvG);
+  svgEl('rect', { x: -24, y: 58, width: 48, height: 12, fill: '#3d4b5d' }, tvG);
+  svgEl('rect', { x: -60, y: 70, width: 120, height: 9, rx: 4, fill: '#3d4b5d' }, tvG);
+  svgEl('rect', { x: -70, y: 79, width: 140, height: 40, rx: 6, fill: '#a5713d', stroke: '#7c5023', 'stroke-width': 3 }, tvG);
+  const tvOk = svgEl('text', { x: 700, y: 168, 'font-size': 26, visibility: 'hidden' }, svg); tvOk.textContent = '✅';
+  // 🧹 пылесос
+  const vacX = 200, vacY = 385;
+  const vacG = svgEl('g', { transform: 'translate(' + vacX + ',' + vacY + ') scale(0.85)' }, svg);
+  svgEl('ellipse', { cx: 0, cy: 26, rx: 22, ry: 8, fill: 'rgba(0,0,0,.18)' }, vacG);
+  svgEl('path', { d: 'M-52,18 a52,44 0 0 1 104,0 z', fill: '#3ecf9a', stroke: '#1d8f63', 'stroke-width': 4 }, vacG);
+  svgEl('rect', { x: -52, y: 14, width: 104, height: 14, rx: 7, fill: '#2fae7e', stroke: '#1d8f63', 'stroke-width': 3 }, vacG);
+  svgEl('circle', { cx: -30, cy: 30, r: 10, fill: '#26313f' }, vacG); svgEl('circle', { cx: 30, cy: 30, r: 10, fill: '#26313f' }, vacG);
+  svgEl('circle', { cx: -12, cy: -10, r: 5, fill: '#fff' }, vacG); svgEl('circle', { cx: 12, cy: -10, r: 5, fill: '#fff' }, vacG);
+  svgEl('circle', { cx: -12, cy: -10, r: 2.4, fill: '#26313f' }, vacG); svgEl('circle', { cx: 12, cy: -10, r: 2.4, fill: '#26313f' }, vacG);
+  const vacBtn = svgEl('circle', { cx: 0, cy: 6, r: 11, fill: '#ff5252', stroke: '#a82626', 'stroke-width': 3, cursor: 'pointer' }, vacG);
+  const vacOk = svgEl('text', { x: 140, y: 340, 'font-size': 26, visibility: 'hidden' }, svg); vacOk.textContent = '✅';
+  function vacStart() {
+    if (vacOn) return; vacOn = true;
+    vacBtn.setAttribute('fill', '#3ecf5e'); vacBtn.setAttribute('stroke', '#1d8f3d');
+    if (actx && S.sound) { const o = actx.createOscillator(), g = actx.createGain(); o.type = 'sawtooth'; o.frequency.value = 85; const l = actx.createBiquadFilter(); l.type = 'lowpass'; l.frequency.value = 350; o.connect(l); l.connect(g); g.connect(actx.destination); const t0 = actx.currentTime; g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(0.09, t0 + 0.15); o.frequency.linearRampToValueAtTime(130, t0 + 1.0); g.gain.linearRampToValueAtTime(0.0001, t0 + 1.3); o.start(t0); o.stop(t0 + 1.4); }
+    vacG.animate([{ transform: 'translate(' + vacX + 'px,' + (vacY - 2) + 'px) scale(0.85)' }, { transform: 'translate(' + vacX + 'px,' + (vacY + 2) + 'px) scale(0.85)' }, { transform: 'translate(' + vacX + 'px,' + vacY + 'px) scale(0.85)' }], { duration: 240, iterations: 4 });
+    vacOk.setAttribute('visibility', 'visible');
+    toast('ВЖЖЖ! 🧹 Пылесос работает!');
+    checkWin();
+  }
+  vacBtn.addEventListener('pointerdown', ev => {
+    ev.stopPropagation(); sndClick();
+    if (vacOn) return;
+    if (vacPlugged) { vacStart(); }
+    else toast('Пшш… Тишина. Пылесосу нужно электричество! ⚡');
+  });
+  // универсальные перетаскивалки (берём БЛИЖАЙШИЙ предмет — вилки лежат рядом с ящиками!)
+  const drags = []; let dragObj = null;
+  svg.addEventListener('pointerdown', ev => {
+    const pt = svgPt(svg, ev); let best = null, bd = 1e9;
+    for (const d of drags) { if (!d.active) continue; const dist = Math.hypot(pt.x - d.x, pt.y - d.y); if (dist < d.r && dist < bd) { bd = dist; best = d; } }
+    if (best) { dragObj = best; ev.preventDefault(); }
+  });
+  api.on(window, 'pointermove', ev => { if (!dragObj) return; const pt = svgPt(svg, ev); dragObj.x = pt.x; dragObj.y = pt.y; dragObj.setPos(pt.x, pt.y); });
+  api.on(window, 'pointerup', () => { if (!dragObj) return; const d = dragObj; dragObj = null; d.onDrop && d.onDrop(); });
+  function goHome(d) { d.x = d.hx; d.y = d.hy; d.setPos(d.hx, d.hy); }
+  // вилки с проводами (у телика и пылесоса)
+  const slotOcc = [null, null, null]; // места в тройнике
+  function makePlug(dev, ax, ay, hx, hy, color) {
+    const cord = svgEl('path', { d: '', stroke: color, 'stroke-width': 6, fill: 'none', 'stroke-linecap': 'round' }, svg);
+    const g = svgEl('g', { cursor: 'grab' }, svg);
+    svgEl('rect', { x: -14, y: -12, width: 26, height: 24, rx: 7, fill: '#26313f' }, g);
+    svgEl('rect', { x: -22, y: -8, width: 12, height: 5, rx: 2.5, fill: '#c9a44a' }, g);
+    svgEl('rect', { x: -22, y: 3, width: 12, height: 5, rx: 2.5, fill: '#c9a44a' }, g);
+    const d = { x: hx, y: hy, hx, hy, r: 40, active: true, dev,
+      setPos(x, y) { g.setAttribute('transform', 'translate(' + x + ',' + y + ')'); cord.setAttribute('d', 'M' + ax + ',' + ay + ' Q' + ((ax + x) / 2) + ',' + (Math.max(ay, y) + 44) + ' ' + (x + 12) + ',' + y); },
+      onDrop() {
+        if (Math.hypot(d.x - sockX, d.y - (sockY + 20)) > 78) { goHome(d); return; }
+        // хотим воткнуться!
+        if (!adapterInstalled) {
+          if (tvPlugged || vacPlugged) { toast('ЗАНЯТО! Розетка всего одна… Может, в ящиках найдётся что-то полезное? 🗄️'); blip(220, 0.2, 'sawtooth', 0.08); goHome(d); return; }
+          d.plugIn(sockX + 16, sockY);
+        } else {
+          const si = slotOcc.indexOf(null);
+          if (si < 0) { goHome(d); return; }
+          slotOcc[si] = dev;
+          d.plugIn(352 + si * 32 + 14, 338);
+        }
+      },
+      plugIn(px, py) {
+        d.active = false; d.x = px; d.y = py; d.setPos(px, py);
+        svgEl('text', { x: px, y: py - 30, 'text-anchor': 'middle', 'font-size': 22 }, svg).textContent = '⚡';
+        sndCoin();
+        if (dev === 'tv') { tvPlugged = true; toast('Телевизор в сети! ⚡ Теперь нужен пульт 📺'); }
+        else { vacPlugged = true; if (needBtn) toast('Электричество есть! ⚡ Жми кнопку на пылесосе!'); else vacStart(); }
+      } };
+    d.setPos(hx, hy);
+    drags.push(d); return d;
+  }
+  makePlug('tv', 556, 300, 545, 468, '#26313f');
+  makePlug('vac', 238, 392, 305, 462, '#1d8f63');
+  // переходник-тройник (в одном из ящиков!)
+  let adapterObj = null;
+  function makeAdapter(x, y) {
+    const g = svgEl('g', { cursor: 'grab' }, svg);
+    svgEl('rect', { x: -34, y: -14, width: 68, height: 28, rx: 8, fill: '#f2f5f9', stroke: '#8b97a6', 'stroke-width': 3 }, g);
+    [-20, 0, 20].forEach(ox => { svgEl('circle', { cx: ox - 3, cy: 0, r: 2.4, fill: '#26313f' }, g); svgEl('circle', { cx: ox + 3, cy: 0, r: 2.4, fill: '#26313f' }, g); });
+    const d = { x, y, hx: x, hy: y, r: 42, active: true,
+      setPos(px, py) { g.setAttribute('transform', 'translate(' + px + ',' + py + ')'); },
+      onDrop() {
+        if (Math.hypot(d.x - sockX, d.y - sockY) < 70) {
+          adapterInstalled = true; d.active = false;
+          d.setPos(400, 338); d.x = 400; d.y = 338;
+          svgEl('line', { x1: 400, y1: 312, x2: 400, y2: 326, stroke: '#26313f', 'stroke-width': 5 }, svg);
+          sndCoin(); toast('ТРОЙНИК в розетке! 🔌 Теперь места хватит всем!');
+        } else goHome(d);
+      } };
+    d.setPos(x, y);
+    drags.push(d); adapterObj = d; return d;
+  }
+  // пульты
+  function makeRemoteA(x, y, real) {
+    const g = svgEl('g', { cursor: 'grab' }, svg);
+    svgEl('rect', { x: -11, y: -24, width: 22, height: 48, rx: 7, fill: real ? '#26313f' : '#f06e21', stroke: real ? '#000' : '#b34a0e', 'stroke-width': 2 }, g);
+    svgEl('circle', { cx: 0, cy: -13, r: 4.5, fill: real ? '#ff5252' : '#ffd23b' }, g);
+    [[-5, -2], [5, -2], [-5, 9], [5, 9]].forEach(([bx, by]) => svgEl('circle', { cx: bx, cy: by, r: 3, fill: real ? '#8b97a6' : '#ffe9b0' }, g));
+    const d = { x, y, hx: x, hy: y, r: 38, active: true,
+      setPos(px, py) { g.setAttribute('transform', 'translate(' + px + ',' + py + ')'); },
+      onDrop() {
+        if (Math.hypot(d.x - 620, d.y - 235) < 100) {
+          if (!tvPlugged) { toast('Клик-клик… НИЧЕГО! Телевизор же не в розетке 🔌 Сначала электричество!'); goHome(d); return; }
+          if (!real) { toast('Это ИГРУШЕЧНЫЙ пульт! 🧸 Телевизор не слушается…'); g.animate([{ opacity: 1 }, { opacity: 0.4 }, { opacity: 1 }], { duration: 400 }); goHome(d); return; }
+          d.active = false;
+          const defs = svgEl('defs', {}, svg); const gr = svgEl('linearGradient', { id: 'tvGradA', x1: 0, y1: 0, x2: 1, y2: 1 }, defs);
+          svgEl('stop', { offset: '0%', 'stop-color': '#39d0ff' }, gr); svgEl('stop', { offset: '50%', 'stop-color': '#ffd23b' }, gr); svgEl('stop', { offset: '100%', 'stop-color': '#ff6ec7' }, gr);
+          tvScr.setAttribute('fill', 'url(#tvGradA)');
+          svgEl('text', { x: 620, y: 243, 'text-anchor': 'middle', 'font-size': 30 }, svg).textContent = '📺✨';
+          tvOn = true; tvOk.setAttribute('visibility', 'visible'); sndCoin();
+          toast('Ура! Телевизор работает! 📺');
+          checkWin();
+        } else goHome(d);
+      } };
+    d.setPos(x, y);
+    drags.push(d); return d;
+  }
+  if (p.remoteIn === 'floor') makeRemoteA(468, 470, true);
+  // ящики: в одном ПЕРЕХОДНИК, где-то пульт (и пульт-обманка!)
+  const order = shuffle([...Array(nb).keys()], rng);
+  const adapterIdx = order[0];
+  const remoteIdx = p.remoteIn === 'box' ? order[1] : -1;
+  const fakeIdx = p.fake && nb > 2 ? order[2] : -1;
+  const decors = ['🧸', '🧦', '🥄', '🎲', '🧵'];
+  for (let i = 0; i < nb; i++) {
+    const bx = 90 + i * (620 / Math.max(1, nb - 1)), by = 508;
+    const g = svgEl('g', { transform: 'translate(' + bx + ',' + by + ')', cursor: 'pointer' }, svg);
+    svgEl('rect', { x: -44, y: -28, width: 88, height: 56, rx: 9, fill: '#8a5a2b', stroke: '#5f3d1c', 'stroke-width': 3 }, g);
+    const inner = svgEl('g', {}, g);
+    const lid = svgEl('rect', { x: -44, y: -40, width: 88, height: 18, rx: 6, fill: '#a5713d', stroke: '#5f3d1c', 'stroke-width': 3 }, g);
+    let opened = false;
+    g.addEventListener('pointerdown', ev => {
+      if (opened) return; // открытый ящик клики НЕ съедает — иначе не схватить переходник!
+      ev.stopPropagation();
+      opened = true; sndClick();
+      lid.style.transition = 'transform .3s'; lid.style.transformOrigin = '-44px -40px'; lid.setAttribute('transform', 'rotate(-70)');
+      if (i === adapterIdx) { makeAdapter(bx, by - 44); toast('ПЕРЕХОДНИК! 🔌 С ним розеток хватит всем — тащи его к розетке!'); }
+      else if (i === remoteIdx) { makeRemoteA(bx, by - 44, true); toast('Пульт! 📺 Пригодится…'); }
+      else if (i === fakeIdx) { makeRemoteA(bx, by - 44, false); toast('Какой-то пульт… Взять?'); }
+      else { const t = svgEl('text', { x: 0, y: 4, 'text-anchor': 'middle', 'font-size': 24 }, inner); t.textContent = decors[Math.floor(rng() * decors.length)]; }
+    });
+  }
+} };
+
+// ---------- 🔍 НАЙДИ ОТЛИЧИЯ (идея Марка 18.07!) ----------
+TYPES.diffs = { build(svg, p, api) {
+  const k = p.k || 3, rng = api.rng;
+  const PW = 360, PH = 330, LX = 30, RX = 410, TY = 195;
+  // элементы сценки (координаты внутри картинки 360×330); alt = «испорченная» версия справа
+  const ELS = [
+    { x: 45, y: 45, draw(g, alt) { // солнышко: жёлтое ↔ оранжевое
+      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; svgEl('line', { x1: 45 + Math.cos(a) * 24, y1: 45 + Math.sin(a) * 24, x2: 45 + Math.cos(a) * 33, y2: 45 + Math.sin(a) * 33, stroke: alt ? '#ff8c00' : '#ffb300', 'stroke-width': 5, 'stroke-linecap': 'round' }, g); }
+      svgEl('circle', { cx: 45, cy: 45, r: 19, fill: alt ? '#ff9d2e' : '#ffd23b', stroke: '#e8a800', 'stroke-width': 3 }, g);
+    } },
+    { x: 160, y: 40, draw(g, alt) { if (alt) return; // облако: есть ↔ пропало
+      svgEl('ellipse', { cx: 160, cy: 42, rx: 30, ry: 14, fill: '#fff', stroke: '#c6d2e0', 'stroke-width': 2.5 }, g);
+      svgEl('ellipse', { cx: 145, cy: 34, rx: 17, ry: 11, fill: '#fff' }, g);
+      svgEl('ellipse', { cx: 175, cy: 34, rx: 14, ry: 9, fill: '#fff' }, g);
+    } },
+    { x: 300, y: 50, draw(g, alt) { if (alt) return; // птичка: есть ↔ улетела
+      svgEl('path', { d: 'M285,50 q8,-10 15,0 q7,-10 15,0', stroke: '#26313f', 'stroke-width': 3.5, fill: 'none', 'stroke-linecap': 'round' }, g);
+    } },
+    { x: 140, y: 112, draw(g, alt) { // крыша: красная ↔ зелёная
+      svgEl('polygon', { points: '58,140 140,86 222,140', fill: alt ? '#3e9d4e' : '#c0392b', stroke: '#8b2e22', 'stroke-width': 3 }, g);
+    } },
+    { x: 194, y: 82, draw(g, alt) { // дымоход: с дымом ↔ без
+      svgEl('rect', { x: 186, y: 92, width: 16, height: 26, fill: '#7c5023' }, g);
+      if (!alt) { svgEl('circle', { cx: 196, cy: 80, r: 6, fill: '#c6d2e0', opacity: 0.9 }, g); svgEl('circle', { cx: 203, cy: 68, r: 4.5, fill: '#c6d2e0', opacity: 0.7 }, g); }
+    } },
+    { x: 112, y: 196, draw(g, alt) { // окно: открытое ↔ со шторками
+      svgEl('rect', { x: 92, y: 176, width: 40, height: 40, rx: 4, fill: alt ? '#7fb4e8' : '#fff', stroke: '#7c5023', 'stroke-width': 3 }, g);
+      if (alt) { svgEl('polygon', { points: '92,176 108,176 92,216', fill: '#3b6ea8' }, g); svgEl('polygon', { points: '132,176 116,176 132,216', fill: '#3b6ea8' }, g); }
+      else { svgEl('line', { x1: 112, y1: 176, x2: 112, y2: 216, stroke: '#7c5023', 'stroke-width': 2.5 }, g); svgEl('line', { x1: 92, y1: 196, x2: 132, y2: 196, stroke: '#7c5023', 'stroke-width': 2.5 }, g); }
+    } },
+    { x: 175, y: 222, draw(g, alt) { // ручка двери: слева ↔ справа
+      svgEl('rect', { x: 155, y: 190, width: 40, height: 62, rx: 5, fill: '#8a5a2b', stroke: '#5f3d1c', 'stroke-width': 3 }, g);
+      svgEl('circle', { cx: alt ? 187 : 163, cy: 222, r: 4.5, fill: '#ffd23b' }, g);
+    } },
+    { x: 295, y: 165, draw(g, alt) { // яблоня: 3 яблока ↔ 2
+      svgEl('rect', { x: 289, y: 195, width: 12, height: 55, fill: '#7c5023' }, g);
+      svgEl('circle', { cx: 295, cy: 165, r: 38, fill: '#5aa85e', stroke: '#3e7d42', 'stroke-width': 3 }, g);
+      svgEl('circle', { cx: 280, cy: 156, r: 6, fill: '#e74c3c' }, g);
+      svgEl('circle', { cx: 298, cy: 182, r: 6, fill: '#e74c3c' }, g);
+      if (!alt) svgEl('circle', { cx: 310, cy: 152, r: 6, fill: '#e74c3c' }, g);
+    } },
+    { x: 48, y: 278, draw(g, alt) { // цветок: розовый ↔ голубой
+      svgEl('line', { x1: 48, y1: 285, x2: 48, y2: 312, stroke: '#3e7d42', 'stroke-width': 3.5 }, g);
+      for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2 - Math.PI / 2; svgEl('circle', { cx: 48 + Math.cos(a) * 9, cy: 278 + Math.sin(a) * 9, r: 6, fill: alt ? '#3b9bff' : '#ff6ec7' }, g); }
+      svgEl('circle', { cx: 48, cy: 278, r: 5, fill: '#ffd23b' }, g);
+    } },
+    { x: 258, y: 280, draw(g, alt) { // кот: хвост вверх ↔ вниз
+      svgEl('ellipse', { cx: 258, cy: 290, rx: 22, ry: 12, fill: '#8d6e63' }, g);
+      svgEl('circle', { cx: 238, cy: 276, r: 11, fill: '#8d6e63' }, g);
+      svgEl('polygon', { points: '230,268 233,258 238,267', fill: '#8d6e63' }, g);
+      svgEl('polygon', { points: '240,267 245,258 248,268', fill: '#8d6e63' }, g);
+      svgEl('circle', { cx: 234, cy: 275, r: 1.6, fill: '#26313f' }, g); svgEl('circle', { cx: 242, cy: 275, r: 1.6, fill: '#26313f' }, g);
+      svgEl('path', { d: alt ? 'M278,288 q14,6 16,18' : 'M278,288 q16,-6 14,-22', stroke: '#8d6e63', 'stroke-width': 6, fill: 'none', 'stroke-linecap': 'round' }, g);
+    } },
+  ];
+  const diffSet = new Set(shuffle([...Array(ELS.length).keys()], rng).slice(0, k));
+  const foundSet = new Set(); let miss = 0; const MAXM = 3;
+  function drawScene(ox, altMode) {
+    const g = svgEl('g', { transform: 'translate(' + ox + ',' + TY + ')' }, svg);
+    svgEl('rect', { x: 0, y: 0, width: PW, height: PH, rx: 10, fill: '#eaf4ff', stroke: '#8b97a6', 'stroke-width': 4 }, g);
+    svgEl('path', { d: 'M4,238 h' + (PW - 8) + ' v' + (PH - 242) + ' a10,10 0 0 1 -10,10 h' + (-(PW - 28)) + ' a10,10 0 0 1 -10,-10 z', fill: '#bfe3a0' }, g);
+    svgEl('rect', { x: 70, y: 138, width: 140, height: 114, fill: '#f7e2b0', stroke: '#c9a45e', 'stroke-width': 3 }, g);
+    ELS.forEach((e, i) => e.draw(g, altMode && diffSet.has(i)));
+    return g;
+  }
+  drawScene(LX, false); drawScene(RX, true);
+  const counter = svgEl('text', { x: 400, y: 170, 'text-anchor': 'middle', 'font-size': 26, 'font-weight': 900, fill: '#8b97a6' }, svg);
+  const missT = svgEl('text', { x: 400, y: 550, 'text-anchor': 'middle', 'font-size': 24, 'font-weight': 900, fill: '#8b97a6' }, svg);
+  function setCnt() {
+    counter.textContent = '🔍 ' + foundSet.size + ' / ' + k;
+    missT.textContent = 'Ошибки: ' + '❌'.repeat(miss) + '⚪'.repeat(Math.max(0, MAXM - miss));
+  }
+  setCnt();
+  svg.addEventListener('pointerdown', ev => {
+    if (foundSet.size >= k || miss >= MAXM) return;
+    const pt = svgPt(svg, ev);
+    let lx = -1, ly = -1;
+    if (pt.x >= LX && pt.x <= LX + PW && pt.y >= TY && pt.y <= TY + PH) { lx = pt.x - LX; ly = pt.y - TY; }
+    else if (pt.x >= RX && pt.x <= RX + PW && pt.y >= TY && pt.y <= TY + PH) { lx = pt.x - RX; ly = pt.y - TY; }
+    if (lx < 0) return; // мимо картинок — не считается
+    let best = -1, bd = 1e9;
+    ELS.forEach((e, i) => { const d = Math.hypot(lx - e.x, ly - e.y); if (d < bd) { bd = d; best = i; } });
+    if (best >= 0 && bd < 38 && diffSet.has(best)) {
+      if (foundSet.has(best)) return; // уже нашёл — не ошибка
+      foundSet.add(best); sndCoin();
+      [LX, RX].forEach(ox => svgEl('circle', { cx: ox + ELS[best].x, cy: TY + ELS[best].y, r: 30, fill: 'none', stroke: '#ff5252', 'stroke-width': 5 }, svg));
+      setCnt();
+      if (foundSet.size >= k) setTimeout(() => api.win(), 500);
+    } else {
+      // ответ на вопрос Марка: КРАСНАЯ лампа — за 3 промаха!
+      miss++; blip(220, 0.2, 'sawtooth', 0.08);
+      const xm = svgEl('text', { x: pt.x, y: pt.y + 8, 'text-anchor': 'middle', 'font-size': 30 }, svg); xm.textContent = '✖️';
+      setTimeout(() => xm.remove(), 700);
+      setCnt();
+      if (miss >= MAXM) api.fail();
+      else toast(miss === MAXM - 1 ? 'Осторожно! Ещё один промах — и красная лампа! 🔴' : 'Тут всё одинаково! Смотри внимательнее 🔍');
+    }
+  });
 } };
 
 // ---------- 🎭 УРОВНИ-ПРИКОЛЫ ----------
@@ -1219,27 +1662,31 @@ const BIGNUM_SETS = [
   [{ v: 302, size: 60 }, { v: 320, size: 22 }, { v: 230, size: 44 }, { v: 203, size: 70 }],
   [{ v: 1000000, size: 16 }, { v: 999999, size: 72 }, { v: 500000, size: 40 }, { v: 99999, size: 88 }],
   [{ v: 42, size: 80 }, { v: 43, size: 12 }, { v: 24, size: 56 }, { v: 34, size: 36 }],
+  [{ v: 777, size: 70 }, { v: 7770, size: 18 }, { v: 707, size: 48 }, { v: 7077, size: 32 }],
+  [{ v: 89999, size: 78 }, { v: 90001, size: 14 }, { v: 89998, size: 50 }, { v: 9999, size: 88 }],
 ];
-const ODD_PAIRS = [['🐶', '🐱'], ['🍩', '🍪'], ['😺', '😸'], ['🐸', '🦎'], ['⭐', '🌟'], ['🍦', '💩'], ['🐝', '🪰'], ['🌸', '🌺']];
-const ODD_GRID = [[5, 4], [5, 4], [6, 4], [6, 4], [7, 5], [7, 5], [8, 5], [8, 5]];
-// генераторы уровней по раундам сложности r = 0..7
+const ODD_PAIRS = [['🐶', '🐱'], ['🍩', '🍪'], ['😺', '😸'], ['🐸', '🦎'], ['⭐', '🌟'], ['🍦', '💩'], ['🐝', '🪰'], ['🌸', '🌺'], ['🐭', '🐹'], ['😀', '😃']];
+const ODD_GRID = [[5, 4], [5, 4], [6, 4], [6, 4], [7, 5], [7, 5], [8, 5], [8, 5], [8, 6], [9, 6]];
+// генераторы уровней по раундам сложности r = 0..9 (раунды 8-9 и новые типы — заказ Марка 18.07.2026)
 const GEN = {
-  wires: r => ({ p: { n: [3, 4, 4, 5, 5, 6, 7, 8][r], extra: [1, 2, 3, 3, 4, 4, 5, 6][r] }, task: 'Соедини провода с розетками по цвету. Провода НЕ должны пересекаться!', hint: 'Розеток больше, чем проводов! Выбирай такие, чтобы линии шли ровно и не перекрещивались.' }),
-  icecream: r => ({ p: { n: [8, 8, 10, 10, 12, 12, 12, 12][r], real: [4, 3, 4, 2, 3, 3, 2, 1][r], reach: [110, 110, 100, 95, 90, 85, 80, 75][r] }, task: 'Найди все вкусняшки (' + [4, 3, 4, 2, 3, 3, 2, 1][r] + ' шт)! Не трогай говняшки… 🤢', hint: 'Подтащи ☀️ солнышко ПОБЛИЖЕ к каждой: настоящее мороженое ТАЕТ, а к какашке слетаются мухи!' }),
-  tvroom: r => ({ p: { n: [6, 8, 10, 12, 10, 12, 12, 12][r], fake: r >= 2, rug: r >= 5 }, task: 'Включи телевизор! Где-то спрятан пульт…', hint: r >= 5 ? 'В тумбочках только обманки! Настоящий пульт спрятался под КОВРИКОМ на полу!' : (r >= 2 ? 'Осторожно: один из пультов ИГРУШЕЧНЫЙ 🧸 — он оранжевый и телевизор не включает! Ищи настоящий, тёмный.' : 'Открывай все дверцы подряд! Нашёл пульт — тащи его пальцем прямо к телевизору.') }),
+  wires: r => ({ p: { n: [3, 4, 4, 5, 5, 6, 7, 8, 8, 8][r], extra: [1, 2, 3, 3, 4, 4, 5, 6, 7, 8][r] }, task: 'Соедини провода с розетками по цвету. Провода НЕ должны пересекаться!', hint: 'Розеток больше, чем проводов! Выбирай такие, чтобы линии шли ровно и не перекрещивались.' }),
+  icecream: r => ({ p: { n: [8, 8, 10, 10, 12, 12, 12, 12, 12, 12][r], real: [4, 3, 4, 2, 3, 3, 2, 1, 2, 1][r], reach: [110, 110, 100, 95, 90, 85, 80, 75, 72, 68][r] }, task: 'Найди все вкусняшки (' + [4, 3, 4, 2, 3, 3, 2, 1, 2, 1][r] + ' шт)! Не трогай говняшки… 🤢', hint: 'Подтащи ☀️ солнышко ПОБЛИЖЕ к каждой: настоящее мороженое ТАЕТ, а к какашке слетаются мухи!' }),
+  tvroom: r => ({ p: { n: [6, 8, 10, 12, 10, 12, 12, 12, 12, 12][r], fake: r >= 2, rug: r >= 5 }, task: 'Включи телевизор! Где-то спрятан пульт…', hint: r >= 5 ? 'В тумбочках только обманки! Настоящий пульт спрятался под КОВРИКОМ на полу!' : (r >= 2 ? 'Осторожно: один из пультов ИГРУШЕЧНЫЙ 🧸 — он оранжевый и телевизор не включает! Ищи настоящий, тёмный.' : 'Открывай все дверцы подряд! Нашёл пульт — тащи его пальцем прямо к телевизору.') }),
   bignum: r => ({ p: { nums: BIGNUM_SETS[r] }, task: 'Нажми на САМОЕ БОЛЬШОЕ число!', hint: 'Размер букв — ловушка! Сравнивай сами числа, а не их рост.' }),
-  pipes: r => ({ p: { w: [4, 4, 5, 5, 5, 6, 6, 6][r], h: [3, 3, 3, 4, 4, 4, 4, 4][r] }, task: 'Почини трубы! 🚰 Крути кусочки, чтобы вода дотекла до цветочка.', hint: 'Нажимай на трубу — она поворачивается. Веди дорожку от крана слева к цветку справа!' }),
-  memory: r => ({ p: { len: [3, 4, 4, 5, 5, 6, 6, 7][r] }, task: 'Запомни, как мигают лампочки, и повтори!', hint: 'Проговаривай цвета вслух: «красный, синий…» — так легче запомнить!' }),
+  pipes: r => ({ p: { w: [4, 4, 5, 5, 5, 6, 6, 6, 7, 7][r], h: [3, 3, 3, 4, 4, 4, 4, 4, 4, 5][r], broken: [0, 0, 0, 0, 0, 0, 0, 0, 2, 3][r] }, task: r >= 8 ? 'Почини трубы! 🚰 Осторожно: ТРЕСНУТЫЕ трубы текут — веди воду в обход!' : 'Почини трубы! 🚰 Крути кусочки, чтобы вода дотекла до цветочка.', hint: r >= 8 ? 'Труба с трещиной и капелькой 💧 — сломана! Попадёт вода — вся вытечет, и красная лампа. Строй дорожку МИМО!' : 'Нажимай на трубу — она поворачивается. Веди дорожку от крана слева к цветку справа!' }),
+  memory: r => ({ p: { len: [3, 4, 4, 5, 5, 6, 6, 7, 8, 9][r] }, task: 'Запомни, как мигают лампочки, и повтори!', hint: 'Проговаривай цвета вслух: «красный, синий…» — так легче запомнить!' }),
   oddone: r => ({ p: { pair: ODD_PAIRS[r], cols: ODD_GRID[r][0], rows: ODD_GRID[r][1] }, task: 'Найди ЛИШНЕГО!', hint: 'Один из них чуть-чуть не такой, как все. Смотри внимательно на каждого!' }),
-  cats: r => ({ p: { count: [3, 4, 4, 5, 5, 6, 6, 7][r] }, task: 'Найди всех котиков! Их тут ' + [3, 4, 4, 5, 5, 6, 6, 7][r] + '…', hint: 'Некоторые прячутся ЗА мебелью — нажимай прямо на диван или коробку, где торчат ушки!' }),
-  count: r => ({ p: { k: [5, 6, 7, 8, 9, 10, 11, 12][r] }, task: 'Сколько уточек на картинке? 🦆', hint: 'Хитрые утки прячутся друг за другом! Считай клювики, а не жёлтые пятна.' }),
-  balance: r => ({ p: { target: [4, 6, 7, 8, 9, 10, 11, 11][r] }, task: 'Уравняй весы! Положи гирьки справа.', hint: 'Складывай числа на гирьках — сумма должна быть точно как на оранжевом ящике!' }),
-  mazefinger: r => ({ p: { variant: r % 3, tol: [34, 34, 30, 30, 28, 28, 26, 26][r], webs: [0, 1, 1, 2, 2, 3, 3, 4][r] }, task: r >= 1 ? 'Проведи жучка к звёздочке! Стенки и паутина 🕸️ — опасно!' : 'Проведи жучка к звёздочке! Не задень стенки!', hint: r >= 1 ? 'Паутинки надо аккуратно ОБЪЕЗЖАТЬ по краю дорожки — не спеши, как в Паучьем лабиринте!' : 'Веди пальцем МЕДЛЕННО от зелёного круга. Тише едешь — дальше будешь!' }),
-  sleepy: r => ({ p: {}, task: 'Разбуди соню! 😴', hint: 'Пёрышко щекочет, мегафон пугает соседей… А что звенит по утрам? Тащи его к уху!' }),
+  cats: r => ({ p: { count: [3, 4, 4, 5, 5, 6, 6, 7, 8, 9][r], boxes: [0, 0, 0, 0, 0, 0, 0, 0, 3, 4][r] }, task: 'Найди всех котиков! Их тут ' + [3, 4, 4, 5, 5, 6, 6, 7, 8, 9][r] + '…', hint: r >= 8 ? 'Коты попрятались и ЗА мебель, и ВНУТРЬ ящиков! Открывай все дверцы подряд!' : 'Некоторые прячутся ЗА мебелью — нажимай прямо на диван или коробку, где торчат ушки!' }),
+  count: r => ({ p: { k: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14][r] }, task: 'Сколько уточек на картинке? 🦆', hint: 'Хитрые утки прячутся друг за другом! Считай клювики, а не жёлтые пятна.' }),
+  balance: r => ({ p: { target: [4, 6, 7, 8, 9, 10, 11, 11, 13, 14][r], weights: r >= 8 ? [1, 2, 3, 5, 8] : undefined }, task: 'Уравняй весы! Положи гирьки справа.', hint: 'Складывай числа на гирьках — сумма должна быть точно как на оранжевом ящике!' }),
+  mazefinger: r => ({ p: { variant: r % 3, tol: [34, 34, 30, 30, 28, 28, 26, 26, 24, 24][r], webs: [0, 1, 1, 2, 2, 3, 3, 4, 4, 5][r] }, task: r >= 1 ? 'Проведи жучка к звёздочке! Стенки и паутина 🕸️ — опасно!' : 'Проведи жучка к звёздочке! Не задень стенки!', hint: r >= 1 ? 'Паутинки надо аккуратно ОБЪЕЗЖАТЬ по краю дорожки — не спеши, как в Паучьем лабиринте!' : 'Веди пальцем МЕДЛЕННО от зелёного круга. Тише едешь — дальше будешь!' }),
+  sleepy: r => ({ p: { r }, task: r >= 4 ? 'Разбуди соню! 😴 Будильника нигде нет…' : 'Разбуди соню! 😴', hint: r >= 4 ? 'На виду — одни обманки! Открой ящики: в одном прячется кто-то ОЧЕНЬ громкий. Неси его к уху!' : 'Пёрышко щекочет, мегафон пугает соседей… А что звенит по утрам? Тащи его к уху!' }),
   darkroom: r => ({ p: { dodges: Math.min(2 + r, 4) }, task: 'Ой, темно! Включи свет!', hint: 'Води пальцем по тёмной комнате как фонариком. Выключатель хитрый — убегает, но ты быстрее!' }),
-  vacuum: r => ({ p: { pos: ['right', 'left', 'hidden'][r], needBtn: r >= 1 }, task: 'Пылесос не работает! Почини его и убери пыль с ковра.', hint: r === 0 ? 'Кнопка не поможет — пылесосу нужно электричество! Возьми вилку шнура и тащи её вправо, к розетке на стене!' : (r === 1 ? 'Розетка переехала на ДРУГУЮ сторону! Воткни вилку и потом не забудь нажать кнопку включения!' : 'Розетки нигде нет?.. А что это висит на стене? Загляни ЗА КАРТИНУ! И после розетки нажми кнопку!') }),
-  magnet: r => ({ p: { n: [5, 6, 7, 8, 9, 10, 11, 12][r], boxes: [3, 4, 4, 5, 5, 5, 6, 6][r] }, task: 'Собери все винтики и гайки! Руками трогать НЕЛЬЗЯ — острые!', hint: 'Пальцем — ай, уколешься! Открой ящики внизу: в одном лежит МАГНИТ 🧲. Тащи его — железки сами прилипнут!' }),
-  onestroke: r => ({ p: { n: [4, 5, 6, 6, 7, 8, 9, 10][r], noCross: r >= 2 }, task: r >= 2 ? 'Проведи через ВСЕ точки, не отрывая палец! Линия не должна пересекаться!' : 'Проведи через ВСЕ точки, не отрывая палец от экрана!', hint: r >= 2 ? 'Сначала глазами придумай маршрут без перекрёстков — обычно надо идти по кругу!' : 'Начни с крайней точки и веди палец плавно от точки к точке. Оторвёшь — начнёшь заново!' }),
+  vacuum: r => ({ p: { pos: ['right', 'left', 'hidden', 'closet'][r], needBtn: r >= 1 }, task: r === 3 ? 'Ковёр весь в пыли, а пылесоса нигде нет… Найди его и убери пыль!' : 'Пылесос не работает! Почини его и убери пыль с ковра.', hint: r === 0 ? 'Кнопка не поможет — пылесосу нужно электричество! Возьми вилку шнура и тащи её вправо, к розетке на стене!' : (r === 1 ? 'Розетка переехала на ДРУГУЮ сторону! Воткни вилку и потом не забудь нажать кнопку включения!' : (r === 2 ? 'Розетки нигде нет?.. А что это висит на стене? Загляни ЗА КАРТИНУ! И после розетки нажми кнопку!' : 'Загляни в ШКАФ — пылесос там! Вытащи его на ковёр. Розетка прячется ЗА ОДНОЙ ИЗ КАРТИН (но не за каждой!). И не забудь кнопку!')) }),
+  magnet: r => ({ p: { n: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14][r], boxes: [3, 4, 4, 5, 5, 5, 6, 6, 6, 6][r], rust: [0, 0, 0, 0, 0, 0, 0, 0, 3, 4][r] }, task: r >= 8 ? 'Собери винтики и гайки! РЖАВЫЕ не бери — и руками не трогай!' : 'Собери все винтики и гайки! Руками трогать НЕЛЬЗЯ — острые!', hint: r >= 8 ? 'Тёмные РЖАВЫЕ гайки — брак, такой гайкой никто пользоваться не будет! Обводи магнит ПОДАЛЬШЕ от них. Магнит — в одном из ящиков!' : 'Пальцем — ай, уколешься! Открой ящики внизу: в одном лежит МАГНИТ 🧲. Тащи его — железки сами прилипнут!' }),
+  onestroke: r => ({ p: { n: [4, 5, 6, 6, 7, 8, 9, 10, 11, 12][r], noCross: r >= 2 }, task: r >= 2 ? 'Проведи через ВСЕ точки, не отрывая палец! Линия не должна пересекаться!' : 'Проведи через ВСЕ точки, не отрывая палец от экрана!', hint: r >= 2 ? 'Сначала глазами придумай маршрут без перекрёстков — обычно надо идти по кругу!' : 'Начни с крайней точки и веди палец плавно от точки к точке. Оторвёшь — начнёшь заново!' }),
+  appliances: r => ({ p: { boxes: [4, 5, 6][r], remoteIn: ['floor', 'box', 'box'][r], fake: r >= 2, needBtn: r >= 1 }, task: 'Включи ВСЁ в комнате: свет 💡, телевизор 📺 и пылесос 🧹!', hint: ['Розетка одна, а приборов два! В одном из ящиков лежит ПЕРЕХОДНИК-тройник 🔌 — с ним места хватит всем. А свет включается выключателем на стене!', 'Переходник и пульт прячутся в ящиках! Помни: сначала воткни телевизор в розетку, ПОТОМ неси пульт — без электричества пульт не работает. И кнопку пылесоса не забудь!', 'Один из пультов — ИГРУШКА 🧸, настоящий тёмный! Переходник в ящике, свет — выключателем, телевизору сначала электричество, пылесосу — кнопку!'][r] }),
+  diffs: r => ({ p: { k: [3, 4, 5, 6][r] }, task: 'Найди ' + [3, 4, 5, 6][r] + ' отличий между картинками! 3 ошибки — красная лампа 🔴', hint: 'Сравнивай по кусочкам: солнце, облако, птичка, крыша, дымоход, окно, дверь, дерево, кот, цветок. Что-то точно не совпадает!' }),
 };
 const RR = ['wires', 'icecream', 'tvroom', 'bignum', 'vacuum', 'pipes', 'memory', 'onestroke', 'oddone', 'cats', 'magnet', 'count', 'balance', 'mazefinger', 'sleepy', 'darkroom'];
 const CAPS = { wires: 8, icecream: 8, tvroom: 8, bignum: 8, vacuum: 3, pipes: 8, memory: 8, onestroke: 8, oddone: 8, cats: 8, magnet: 8, count: 8, balance: 8, mazefinger: 8, sleepy: 4, darkroom: 4 };
@@ -1253,6 +1700,21 @@ const TRICKS = [
   { t: 'trick_pet', task: 'Погладь котика 5 раз!', hint: 'Погладить — это провести пальцем по котику туда-сюда. Он замурлычет!' },
 ];
 baseList.splice(6, 0, TRICKS[0]); baseList.splice(24, 0, TRICKS[1]); baseList.splice(49, 0, TRICKS[2]); baseList.splice(74, 0, TRICKS[3]);
+// ===== НОВЫЕ УРОВНИ (заказ Марка 18.07.2026) — строго В КОНЕЦ, чтобы пройденные 119 не сбились =====
+const EXTRA_PLAN = [
+  ['appliances', 0], ['diffs', 0],
+  ['cats', 8], ['pipes', 8], ['sleepy', 4], ['magnet', 8],
+  ['vacuum', 3],
+  ['wires', 8], ['icecream', 8], ['tvroom', 8], ['bignum', 8], ['memory', 8],
+  ['onestroke', 8], ['oddone', 8], ['count', 8], ['balance', 8], ['mazefinger', 8],
+  ['appliances', 1], ['diffs', 1],
+  ['cats', 9], ['pipes', 9], ['sleepy', 5], ['magnet', 9],
+  ['diffs', 2],
+  ['wires', 9], ['icecream', 9], ['tvroom', 9], ['bignum', 9], ['memory', 9],
+  ['onestroke', 9], ['oddone', 9], ['count', 9], ['balance', 9], ['mazefinger', 9],
+  ['appliances', 2], ['diffs', 3],
+];
+EXTRA_PLAN.forEach(([t, r]) => { const s = GEN[t](r); s.t = t; baseList.push(s); });
 baseList.forEach((s, i) => LEVELS.push({ t: s.t, task: s.task, hint: s.hint, p: s.p || {}, seed: i * 977 + 13 }));
 
 // секрет уровня-прикола: зелёная лампочка в шапке зажигается сама!
