@@ -92,6 +92,46 @@
   #toast{ position:fixed; left:50%; bottom:84px; transform:translateX(-50%); background:#1b2333; color:#fff; font-weight:800; padding:12px 20px; border-radius:999px; z-index:60; display:none; box-shadow:0 8px 30px rgba(0,0,0,.35); max-width:86vw; text-align:center; pointer-events:none; }
   .xClose{ position:absolute; top:10px; right:12px; background:none; border:none; color:#8b97a6; font-size:26px; cursor:pointer; }
   .cardWrap{ position:relative; }
+
+/* A warm illustrated puzzle table. Hit areas and puzzle coordinates are unchanged. */
+body{background:#edf3f4;color:#243846}
+.screen{background:radial-gradient(ellipse at 18% 16%,#fff4c9 0,transparent 44%),radial-gradient(ellipse at 89% 81%,#cdece6 0,transparent 45%),#eef5f5}
+#menu{isolation:isolate;padding:70px 20px 28px}
+#menu::before{content:'';position:absolute;z-index:-1;inset:40px max(24px,calc((100vw - 770px)/2));border:1px solid #fff;border-radius:42px;background:#ffffffc9;box-shadow:0 26px 70px #356b7520,inset 0 0 0 7px #ffffff50;pointer-events:none}
+#menuLogo{width:min(36vw,190px);filter:drop-shadow(0 13px 0 #d7ab2819) drop-shadow(0 18px 23px #d7ab281a)}
+#menu h1{font-size:clamp(27px,5.2vw,43px);max-width:630px;letter-spacing:-1.2px;line-height:1.12;margin:14px 0 10px;color:#203b47;text-wrap:balance}
+#menu .sub{font-size:15px;color:#637b83;margin-bottom:24px}
+#menuStats{top:max(14px,env(safe-area-inset-top));right:18px;z-index:2}
+.chip{border:1px solid #d1e0e4;box-shadow:0 3px 0 #c6d8de,0 5px 12px #3157670b;background:linear-gradient(#fff,#f7fbfc);color:#294755}
+.big{border:1px solid #ffffff55;box-shadow:0 5px 0 #1765a2,0 10px 19px #237bbb24;font-size:20px;letter-spacing:.1px;background:linear-gradient(170deg,#58baff,#2786d3);text-shadow:0 1px 1px #155c8433}
+.big.gold{color:#513414;text-shadow:0 1px #fff4bb;background:linear-gradient(170deg,#ffe88d,#ffc83e 70%);box-shadow:0 5px 0 #d99b24,0 10px 22px #dba93424}
+#levels{padding-top:65px;padding-bottom:16px;background:radial-gradient(ellipse at top,#fff8e2,transparent 64%),#edf5f5}
+#levels h2{color:#264750;font-size:27px;letter-spacing:-.6px}
+#levelsGrid{background:#ffffffb5;border:1px solid #fff;box-shadow:0 14px 40px #42616b12;border-radius:25px;padding:17px 12px;gap:13px;scrollbar-width:thin;scrollbar-color:#a9c5cb transparent}
+.lvBtn{border:1px solid #ffffff60;position:relative;background-origin:border-box;transition:transform .15s}
+.lvBtn.done{background:linear-gradient(155deg,#72d898,#29a669);box-shadow:0 4px 0 #19784d,0 6px 12px #19784d18}
+.lvBtn.next{color:#593a16;background:linear-gradient(155deg,#ffed9a,#ffc446);box-shadow:0 4px 0 #cf9528,0 5px 17px #e2b1403a}
+.lvBtn.lock{background:linear-gradient(150deg,#e3edf0,#cfdee4);box-shadow:0 4px 0 #acbec7;color:#738c97}
+#game{background:radial-gradient(ellipse at 12% 0,#fff4d4 0,transparent 54%),#eaf2f3}
+#hud{padding-top:max(10px,env(safe-area-inset-top));background:linear-gradient(#eaf2f3f5,#eaf2f300)}
+#statusBulbs{background:linear-gradient(#fff,#eaf2f4);border:1px solid #ccdde3;box-shadow:0 3px 0 #bfd2d9,0 5px 13px #2647500d;gap:15px;padding:8px 19px}
+.sbulb{border-width:2px;background:radial-gradient(circle at 34% 26%,#fff,#d4e0e7);box-shadow:inset 0 -2px 3px #64788718}
+#lvLabel{color:#657f88;font-size:13px;font-weight:850;letter-spacing:.4px;margin-top:7px}
+#task{color:#203e4a;line-height:1.3;text-wrap:balance;font-size:clamp(15px,3.8vw,21px);padding:0 20px}
+#scene{left:12px;right:82px;bottom:12px;background:#fffdfa;border:1px solid #fff;border-radius:26px;box-shadow:0 5px 0 #cedde1,0 12px 30px #31556412;overflow:hidden;padding:8px}
+#scene svg{border-radius:17px;background:radial-gradient(ellipse at 22% 12%,#fff,#fffdf9 75%)}
+.dockBtn{border:1px solid #ffffff70;box-shadow:0 4px 0 #46627c,0 7px 14px #2c4c6520;transition:transform .12s}
+.overlay{background:#0c2639c9;backdrop-filter:blur(9px)}
+.card{background:linear-gradient(155deg,#264451,#172e40);border:1px solid #7198a766;box-shadow:0 22px 75px #061c3466,inset 0 1px #ffffff12;border-radius:28px}
+.shopRow{background:#ffffff0d;border:1px solid #ffffff12}
+.xClose{z-index:1}
+#toast{background:#203e4af5;border:1px solid #76929b60;box-shadow:0 6px 25px #152f422f}
+@media(max-height:600px){#menu{padding:40px 18px 12px}#menu::before{inset:14px max(16px,calc((100vw - 740px)/2));border-radius:29px}#menuLogo{width:105px}#menu h1{font-size:30px;margin:6px 0}#menu .sub{font-size:13px;margin-bottom:8px}.big{padding:11px 16px;font-size:18px;margin:7px auto}#levels h2{font-size:22px}#levelsGrid{max-height:68vh}}
+@media(max-height:520px){#hud{padding:6px 8px}#task{top:59px;font-size:14px;line-height:1.2;padding:0 24px}#scene{top:87px;left:8px;right:63px;bottom:7px;padding:4px;border-radius:17px}#scene svg{border-radius:12px}#statusBulbs{padding:5px 14px}#lvLabel{font-size:11px;margin-top:4px}.dockBtn{width:44px;height:44px;font-size:20px;border-radius:13px}.dockBtn small{font-size:7px}#dock{gap:7px;right:8px;bottom:9px}.chip{font-size:14px;padding:5px 9px}}
+@media(max-width:480px) and (min-height:521px){#menu::before{inset:73px 13px 34px;border-radius:31px}#menu h1{font-size:32px;max-width:310px}#menuLogo{width:170px}#menu .sub{font-size:13px;text-align:center}#scene{top:143px;left:7px;right:61px;bottom:9px;padding:4px;border-radius:18px}#task{top:93px;font-size:16px;padding:0 13px}#dock{right:6px;bottom:13px;gap:10px}.dockBtn{width:46px;height:46px;font-size:21px;border-radius:14px}.dockBtn small{font-size:7px}#hud .chip{padding:7px 9px;font-size:15px}#statusBulbs{padding:7px 12px}#levelsGrid{grid-template-columns:repeat(auto-fill,58px);width:94vw;gap:11px}.lvBtn{width:58px;height:58px}}
+@media(prefers-reduced-motion:reduce){.lvBtn.next{animation:none}.big,.dockBtn,.lvBtn{transition:none}}
+@media(max-width:480px) and (min-height:521px){#scene{top:154px;left:7px;right:7px;bottom:auto;aspect-ratio:800/560}#dock{left:50%;right:auto;bottom:max(20px,env(safe-area-inset-bottom));transform:translateX(-50%);flex-direction:row;gap:12px}.dockBtn{width:58px;height:58px;font-size:26px;border-radius:17px}.dockBtn small{font-size:8px}body:has(#game.show) #mkl-bar{top:auto;bottom:100px;left:50%;transform:translateX(-50%);flex-direction:row}}
+
 </style>
 </head>
 <body>
@@ -325,6 +365,7 @@ function startLevel(i) {
     fail() { if (failLock) return; failLock = true; onFail(); },
   };
   TYPES[lv.t].build(svg, lv.p || {}, levelApi);
+  brainIllustrate(svg, lv.t);
 }
 function onWin() {
   setBulb('green'); sndWin();
@@ -1723,6 +1764,22 @@ el('greenBulb').addEventListener('pointerdown', () => { if (el('game').classList
 refreshHud();
 el('sndBtn').firstChild.textContent = S.sound ? '🔊' : '🔇';
 
+// Surface shading is confined to illustrated rooms; puzzle colors, clues and hit targets stay original.
+function brainIllustrate(svg,type){
+  if(!['tvroom','vacuum','appliances','cats','sleepy','magnet','balance','trick_door'].includes(type))return;
+  const shades={'#a5713d':['#c59660','#a5713d','#885728'],'#c08b52':['#e1b984','#c08b52','#a7713f'],'#8a5a2b':['#ad7945','#8a5a2b','#6e421f'],'#8d6e63':['#b99887','#8d6e63','#70514a'],'#3b9bff':['#8dcaff','#3b9bff','#2773cb'],'#2f7fe0':['#6ba9ee','#2f7fe0','#2258a8'],'#3ecf9a':['#a1ecd0','#3ecf9a','#26a479'],'#2fae7e':['#6fd4a8','#2fae7e','#227e5d'],'#eaf2fb':['#e2f0fa','#f3f8fc','#d9e6ee'],'#eef4fb':['#e3eff7','#f9fcfe','#dbe8ee'],'#e9f1fa':['#e1edf5','#f4f8fc','#d9e5ed']};
+  const candidates=[...svg.querySelectorAll('rect,ellipse,path')].filter(n=>shades[n.getAttribute('fill')]);
+  const defs=svgEl('defs',{'data-brain-art':'materials'},svg),ids={};let k=0;
+  for(const n of candidates){const col=n.getAttribute('fill');if(!ids[col]){const id='brain-surface-'+k++;ids[col]=id;const g=svgEl('linearGradient',{id,x1:'0%',y1:'0%',x2:'22%',y2:'100%'},defs);shades[col].forEach((c,i)=>svgEl('stop',{offset:i===0?'0%':i===1?'45%':'100%','stop-color':c},g));}n.setAttribute('fill','url(#'+ids[col]+')');}
+  if(['tvroom','vacuum','appliances'].includes(type)){
+    const floor=[...svg.children].find(n=>n.tagName==='rect'&&['#c9a06a','#d8b98a'].includes(n.getAttribute('fill')));
+    if(floor){const id='brain-woodfloor',pat=svgEl('pattern',{id,width:156,height:42,patternUnits:'userSpaceOnUse'},defs);svgEl('rect',{width:156,height:42,fill:'#d1b58c'},pat);svgEl('path',{d:'M0 1H156 M0 41H156 M78 0V42',stroke:'#b9986b','stroke-width':1,fill:'none'},pat);svgEl('path',{d:'M7 10Q40 6 70 11 M84 28Q116 23 150 28 M9 31Q35 27 67 30',stroke:'#ead7b8','stroke-width':1.3,opacity:'.55',fill:'none'},pat);floor.setAttribute('fill','url(#'+id+')');}
+  }
+}
+
+// The menu count follows the real catalogue.
+el('menu').querySelector('.sub').textContent = LEVELS.length + ' хитрых загадок с подвохом 🕵️';
+
 // отладочный хук для автотестов
 window.__dbg = {
   S, LEVELS,
@@ -1798,7 +1855,7 @@ window.__dbg = {
 </script>
 
 
-<script>window.__APP_VER = "d939bf0127";
+<script>window.__APP_VER = "1edc418f42";
 /* scoped PWA updater: the installed offline copy stays until a verified replacement activates. */
 (function () {
   var scope = new URL('./', location.href).href;
