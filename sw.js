@@ -1,10 +1,61 @@
-const CACHE = 'brain-cfa68bb2b6';
-const ASSETS = ['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-512-maskable.png','./apple-touch-icon.png'];
-self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS))); });
-self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
-self.addEventListener('fetch', e => {
-  e.respondWith(caches.match(e.request).then(hit => {
-    const net = fetch(e.request).then(resp => { if (resp.ok) { const cp = resp.clone(); caches.open(CACHE).then(c => c.put(e.request, cp)); } return resp; }).catch(() => hit);
-    return hit || net;
-  }));
+// Scoped offline application updater; version changes with the payload and updater.
+const VERSION = '0b9b466fc2';
+const PREFIX = "brain-";
+const CACHE = PREFIX + VERSION;
+const SCOPE = new URL(self.registration.scope);
+const INDEX = new URL('index.html', SCOPE).href;
+const ASSETS = ["./manifest.webmanifest","./icon-192.png","./icon-512.png","./icon-512-maskable.png","./apple-touch-icon.png"];
+const belongs = url => url.origin === SCOPE.origin && url.pathname.startsWith(SCOPE.pathname);
+self.addEventListener('install', event => {
+  event.waitUntil((async () => {
+    // Installation must fail if the new HTML is missing, stale, or only half deployed.
+    const response = await fetch(new Request(INDEX, { cache: 'reload' }));
+    if (!response.ok) throw new Error('New application document unavailable');
+    const match = (await response.clone().text()).match(/window\.__APP_VER\s*=\s*["']([^"']+)["']/);
+    if (!match || match[1] !== VERSION) throw new Error('New application version not deployed yet');
+    const cache = await caches.open(CACHE);
+    await cache.put(INDEX, response.clone());
+    await cache.put(SCOPE.href, response);
+    await Promise.all(ASSETS.map(async asset => {
+      try {
+        const url = new URL(asset, SCOPE).href;
+        const result = await fetch(new Request(url, { cache: 'reload' }));
+        if (result.ok) await cache.put(url, result);
+      } catch (_) {} // An optional icon never invalidates the already verified game document.
+    }));
+    await self.skipWaiting();
+  })());
+});
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    const names = await caches.keys();
+    await Promise.all(names.filter(name => name.startsWith(PREFIX) && name !== CACHE).map(name => caches.delete(name)));
+    await self.clients.claim();
+    const windows = await self.clients.matchAll({ type: 'window' });
+    for (const client of windows) {
+      const url = new URL(client.url);
+      if (!belongs(url) || url.searchParams.get('v') === VERSION) continue;
+      url.searchParams.set('v', VERSION);
+      // Do not await navigation: it can wait for this activation to finish.
+      client.navigate(url.href).catch(() => {});
+    }
+  })());
+});
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (!belongs(url) || url.pathname === new URL('version.json', SCOPE).pathname) return;
+  const doc = event.request.mode === 'navigate' || event.request.destination === 'document';
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE);
+    const hit = await cache.match(doc ? INDEX : event.request, { ignoreSearch: true });
+    if (hit) return hit;
+    try {
+      const result = await fetch(event.request);
+      if (result.ok) await cache.put(event.request, result.clone());
+      return result;
+    } catch (_) {
+      return doc ? (await cache.match(INDEX)) || Response.error() : Response.error();
+    }
+  })());
 });
