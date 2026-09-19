@@ -548,7 +548,7 @@ TYPES.tvroom = { build(svg, p, api) {
       if (opened) return; opened = true; sndClick();
       door.style.transition = 'transform .3s'; door.style.transformOrigin = '-38px 0px';
       door.setAttribute('transform', 'translate(-58,0) scale(0.25,1)');
-      if (i === remoteIdx && !underRug) { makeRemote(pos.x, pos.y - 2, true); toast('📺 Пульт! Тащи его к телевизору!'); }
+      if (i === remoteIdx && !underRug) { makeRemote(pos.x, pos.y - 2, true);   /* ⚠️ подсказку убрали (Марк 19.09): пульт видно и так */ }
       else if (i === fakeIdx) { makeRemote(pos.x, pos.y - 2, false); toast('Какой-то пульт… Взять?'); }
       else { const d = decors[Math.floor(rng() * decors.length)]; if (d) { const t = svgEl('text', { x: 0, y: 10, 'text-anchor': 'middle', 'font-size': 30 }, inner); t.textContent = d; } }
     });
@@ -565,7 +565,7 @@ TYPES.tvroom = { build(svg, p, api) {
       if (lifted) return; lifted = true; sndClick();
       makeRemote(rugX, 344, true);
       rug.style.transition = 'transform .4s'; rug.setAttribute('transform', 'translate(' + rugX + ',352) rotate(-22) scale(1,0.45)');
-      rug.style.opacity = 0.5; toast('📺 Вот он где! Под ковриком!');
+      rug.style.opacity = 0.5;              /* ⚠️ без подсказки — сам увидит */
     });
   }
   let dragR = null;
@@ -654,6 +654,124 @@ TYPES.bignum = { build(svg, p, api) {
     const t = svgEl('text', { x: 0, y: 0, 'text-anchor': 'middle', 'font-size': o.size, 'font-weight': 900, fill: ['#ff5252', '#3b9bff', '#3ecf5e', '#ffb300', '#b455ff', '#00c9c9'][i % 6] }, g);
     t.textContent = o.v;
     g.addEventListener('pointerdown', () => { if (o.v === maxV) api.win(); else api.fail(); });
+  });
+} };
+
+// ---------- 🌈 РАДУГА ИЗ ТРЁХ ШАРИКОВ (замысел Марка 19.09.2026) ----------
+/* «Тебе нужно сделать радугу, но у тебя только три шарика: красный, жёлтый и синий.
+   Надо соединить их между собой — и получится радуга.»
+   Считается идеально: 3 шарика + 3 смеси = ровно 6 цветов радуги. */
+const РАД_ЦВЕТА = {
+  red:    { c:'#e33127', имя:'красный' },
+  orange: { c:'#f5871f', имя:'оранжевый' },
+  yellow: { c:'#f7d117', имя:'жёлтый' },
+  green:  { c:'#3aa84a', имя:'зелёный' },
+  blue:   { c:'#2b6fd4', имя:'синий' },
+  purple: { c:'#8b3fc4', имя:'фиолетовый' },
+  brown:  { c:'#7a5a3a', имя:'бурый' },
+};
+const РАД_ПОРЯДОК = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'];
+const РАД_СМЕСИ = { 'red+yellow':'orange', 'blue+yellow':'green', 'blue+red':'purple' };
+function радСмесь(a, b) {
+  if (a === b) return null;
+  const пара = [a, b].sort().join('+');
+  if (РАД_СМЕСИ[пара]) return РАД_СМЕСИ[пара];
+  return 'brown';                       // смешал не то — получилась бурая клякса
+}
+TYPES.raduga = { build(svg, p, api) {
+  const пусто = (p.пусто || ['green']).slice();
+  const ловушка = !!p.ловушка, безПодписей = !!p.безПодписей;
+  const cx = 400, cy = 400;
+  const радиусы = [300, 262, 224, 186, 148, 110];
+  const дуги = [];
+  РАД_ПОРЯДОК.forEach((ид, i) => {
+    const r = радиусы[i];
+    const нужна = пусто.includes(ид);
+    const d = 'M ' + (cx - r) + ' ' + cy + ' A ' + r + ' ' + r + ' 0 0 1 ' + (cx + r) + ' ' + cy;
+    const путь = svgEl('path', { d, fill:'none', 'stroke-linecap':'round',
+      stroke: нужна ? '#d8dde6' : РАД_ЦВЕТА[ид].c,
+      'stroke-width': 34,
+      'stroke-dasharray': нужна ? '14 12' : 'none' }, svg);
+    дуги.push({ ид, путь, r, готова: !нужна });
+  });
+  // белое облачко снизу — чтобы радуга «стояла» на нём и низ экрана был чистым
+  svgEl('ellipse', { cx, cy: cy + 26, rx: 330, ry: 46, fill:'#ffffff' }, svg);
+  const инфо = svgEl('text', { x: cx, y: 486, 'text-anchor':'middle', 'font-size':20,
+    'font-weight':800, fill:'#5a6270' }, svg);
+  инфо.textContent = безПодписей ? 'Дуги пустые — вспомни порядок радуги!'
+                                 : 'Тащи шарик на шарик — получится новый цвет';
+
+  /* ── шарики ── */
+  const шарики = [];
+  function шарик(ид, x, y, свой) {
+    const g = svgEl('g', { transform:'translate(' + x + ',' + y + ')', cursor:'grab' }, svg);
+    const к = svgEl('circle', { cx:0, cy:0, r:30, fill:РАД_ЦВЕТА[ид].c,
+      stroke:'#ffffff', 'stroke-width':4 }, g);
+    svgEl('circle', { cx:-9, cy:-10, r:8, fill:'#ffffff', opacity:0.45 }, g);
+    const об = { ид, g, к, x, y, дом:{ x, y }, свой:!!свой };
+    шарики.push(об); return об;
+  }
+  шарик('red', 200, 520, true); шарик('yellow', 400, 520, true); шарик('blue', 600, 520, true);
+
+  /* ── перетаскивание ── */
+  let тащим = null;
+  const точка = e => { const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+    return pt.matrixTransform(svg.getScreenCTM().inverse()); };
+  function поставить(об, x, y) { об.x = x; об.y = y;
+    об.g.setAttribute('transform', 'translate(' + x + ',' + y + ')'); }
+  function домой(об) { поставить(об, об.дом.x, об.дом.y); }
+  function убрать(об) { const i = шарики.indexOf(об); if (i >= 0) шарики.splice(i, 1); об.g.remove(); }
+
+  api.on(svg, 'pointerdown', e => {
+    const t = точка(e);
+    let ближ = null, лучш = 40;
+    for (const об of шарики) { const d = Math.hypot(t.x - об.x, t.y - об.y);
+      if (d < лучш) { лучш = d; ближ = об; } }
+    if (ближ) { тащим = ближ; ближ.g.parentNode.appendChild(ближ.g); }
+  });
+  api.on(svg, 'pointermove', e => { if (!тащим) return; e.preventDefault();
+    const t = точка(e); поставить(тащим, t.x, t.y); }, { passive:false });
+  api.on(svg, 'pointerup', () => {
+    if (!тащим) return;
+    const об = тащим; тащим = null;
+    // 1) уронил на другой шарик — смешиваем
+    for (const др of шарики) {
+      if (др === об) continue;
+      if (Math.hypot(др.x - об.x, др.y - об.y) > 46) continue;
+      const нов = радСмесь(об.ид, др.ид);
+      if (!нов) { домой(об); return; }
+      if (нов === 'brown' && !ловушка) {           // на лёгких ступенях просто не смешиваем
+        toast('Эти двое не дружат 🙂 Попробуй другую пару');
+        домой(об); return;
+      }
+      const x = (об.x + др.x)/2, y = (об.y + др.y)/2;
+      if (!об.свой) убрать(об); else домой(об);
+      if (!др.свой) убрать(др);
+      const н = шарик(нов, x, y, false); н.дом = { x, y };
+      sndCoin();
+      if (нов === 'brown') toast('Бурая клякса! 🟤 Так все три вместе мешать нельзя');
+      else toast(РАД_ЦВЕТА[нов].имя.toUpperCase() + '!');
+      return;
+    }
+    // 2) уронил на дугу — красим, если цвет тот самый
+    for (const д of дуги) {
+      if (д.готова) continue;
+      const dx = об.x - cx, dy = об.y - cy;
+      if (dy > 20) continue;
+      const r = Math.hypot(dx, dy);
+      if (Math.abs(r - д.r) > 26) continue;
+      if (д.ид !== об.ид) { toast('Не эта дуга 🌈'); домой(об); return; }
+      д.готова = true;
+      д.путь.setAttribute('stroke', РАД_ЦВЕТА[д.ид].c);
+      д.путь.setAttribute('stroke-dasharray', 'none');
+      д.путь.animate([{ opacity:0.2 }, { opacity:1 }], { duration:420 });
+      sndCoin();
+      if (!об.свой) убрать(об); else домой(об);
+      if (дуги.every(x => x.готова)) { инфо.textContent = '🌈 РАДУГА ГОТОВА!';
+        setTimeout(() => api.win(), 500); }
+      return;
+    }
+    домой(об);
   });
 } };
 
@@ -986,7 +1104,7 @@ TYPES.sleepy = { build(svg, p, api) {
         ev.stopPropagation();
         opened = true; sndClick();
         lid.style.transition = 'transform .3s'; lid.style.transformOrigin = '-44px -42px'; lid.setAttribute('transform', 'rotate(-70)');
-        if (i === wakeIdx) { addObj(wake, bx, by - 34); toast(r === 4 ? 'ПЕТУХ! 🐓 Вот кто умеет будить — неси его к уху!' : 'БАРАБАН! 🥁 Громче не бывает — неси его к уху!'); }
+        if (i === wakeIdx) { addObj(wake, bx, by - 34); }   /* ⚠️ без подсказки, что с ним делать */
         else { const t = svgEl('text', { x: 0, y: 4, 'text-anchor': 'middle', 'font-size': 26 }, inner); t.textContent = decors[Math.floor(rng() * decors.length)]; }
       });
     }
@@ -1103,7 +1221,7 @@ TYPES.vacuum = { build(svg, p, api) {
       ev.stopPropagation(); if (done) return; done = true; sndClick();
       pic.style.transition = 'transform .55s'; pic.setAttribute('transform', 'translate(' + px + ',' + (py + 150) + ') rotate(-14)');
       setTimeout(() => { pic.style.opacity = 0.55; }, 400);
-      if (hasSock) { sockOpen = true; sock.setAttribute('visibility', 'visible'); toast('Ого! За картиной РОЗЕТКА! 🔌'); }
+      if (hasSock) { sockOpen = true; sock.setAttribute('visibility', 'visible'); }
       else toast('Пусто… только пыльная стена 🕸️');
     });
   }
@@ -1128,7 +1246,7 @@ TYPES.vacuum = { build(svg, p, api) {
       dl.style.transition = 'transform .4s'; dl.style.transformOrigin = '-72px 0px'; dl.setAttribute('transform', 'scale(0.18,1)');
       dr.style.transition = 'transform .4s'; dr.style.transformOrigin = '72px 0px'; dr.setAttribute('transform', 'scale(0.18,1)');
       vac.setAttribute('visibility', 'visible'); // пылесос показался в открытом шкафу
-      toast('Вот он где! 🧹 Тащи пылесос на ковёр!');
+      /* ⚠️ без подсказки: пылесос найден, дальше сам */
     });
   }
   const vac = svgEl('g', { transform: 'translate(' + vx + ',' + vy + ')' + (closet ? ' scale(0.72)' : ''), visibility: closet ? 'hidden' : 'visible' }, svg);
@@ -1190,7 +1308,7 @@ TYPES.vacuum = { build(svg, p, api) {
         placed = true; vy = 360; vx = Math.max(250, Math.min(560, vx)); setVac();
         plugX = vx + 88 * mir; plugY = 420;
         cord.setAttribute('visibility', 'visible'); plug.setAttribute('visibility', 'visible'); drawCord();
-        sndCoin(); toast('Пылесос на месте! А где розетка?.. 🤔');
+        sndCoin();
       } else { vx = 92; vy = 292; setVac(); } // не донёс — вернулся в шкаф
     });
   }
@@ -1202,7 +1320,7 @@ TYPES.vacuum = { build(svg, p, api) {
     if (sockOpen && Math.hypot(plugX - (sockX - 22 * mir), plugY - sockY) < 46) {
       plugged = true; plugX = sockX - 24 * mir; plugY = sockY; drawCord();
       svgEl('text', { x: sockX - 8 * mir, y: sockY - 36, 'text-anchor': 'middle', 'font-size': 26 }, svg).textContent = '⚡';
-      if (needBtn) { sndCoin(); toast('Электричество есть! ⚡ Теперь жми кнопку на пылесосе!'); }
+      if (needBtn) { sndCoin(); }        /* ⚠️ не подсказываем про кнопку */
       else startMotor();
     }
   });
@@ -1311,7 +1429,7 @@ TYPES.magnet = { build(svg, p, api) {
         magX = bx; magY = by - 8;
         magnet = svgEl('text', { x: 0, y: 0, 'text-anchor': 'middle', 'font-size': 46, cursor: 'grab', transform: 'translate(' + magX + ',' + magY + ')' }, svg);
         magnet.textContent = '🧲';
-        toast('МАГНИТ! 🧲 Тащи его к винтикам!');
+        /* ⚠️ подсказку про магнит убрали — в этом и загадка */
       } else { const t = svgEl('text', { x: 0, y: 4, 'text-anchor': 'middle', 'font-size': 26 }, inner); t.textContent = decors[Math.floor(rng() * decors.length)]; }
     });
   }
@@ -1461,8 +1579,8 @@ TYPES.appliances = { build(svg, p, api) {
         d.active = false; d.x = px; d.y = py; d.setPos(px, py);
         svgEl('text', { x: px, y: py - 30, 'text-anchor': 'middle', 'font-size': 22 }, svg).textContent = '⚡';
         sndCoin();
-        if (dev === 'tv') { tvPlugged = true; toast('Телевизор в сети! ⚡ Теперь нужен пульт 📺'); }
-        else { vacPlugged = true; if (needBtn) toast('Электричество есть! ⚡ Жми кнопку на пылесосе!'); else vacStart(); }
+        if (dev === 'tv') { tvPlugged = true; }
+        else { vacPlugged = true; if (!needBtn) vacStart(); }
       } };
     d.setPos(hx, hy);
     drags.push(d); return d;
@@ -1482,7 +1600,7 @@ TYPES.appliances = { build(svg, p, api) {
           adapterInstalled = true; d.active = false;
           d.setPos(400, 338); d.x = 400; d.y = 338;
           svgEl('line', { x1: 400, y1: 312, x2: 400, y2: 326, stroke: '#26313f', 'stroke-width': 5 }, svg);
-          sndCoin(); toast('ТРОЙНИК в розетке! 🔌 Теперь места хватит всем!');
+          sndCoin();
         } else goHome(d);
       } };
     d.setPos(x, y);
@@ -1727,6 +1845,27 @@ const GEN = {
   magnet: r => ({ p: { n: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14][r], boxes: [3, 4, 4, 5, 5, 5, 6, 6, 6, 6][r], rust: [0, 0, 0, 0, 0, 0, 0, 0, 3, 4][r] }, task: r >= 8 ? 'Собери винтики и гайки! РЖАВЫЕ не бери — и руками не трогай!' : 'Собери все винтики и гайки! Руками трогать НЕЛЬЗЯ — острые!', hint: r >= 8 ? 'Тёмные РЖАВЫЕ гайки — брак, такой гайкой никто пользоваться не будет! Обводи магнит ПОДАЛЬШЕ от них. Магнит — в одном из ящиков!' : 'Пальцем — ай, уколешься! Открой ящики внизу: в одном лежит МАГНИТ 🧲. Тащи его — железки сами прилипнут!' }),
   onestroke: r => ({ p: { n: [4, 5, 6, 6, 7, 8, 9, 10, 11, 12][r], noCross: r >= 2 }, task: r >= 2 ? 'Проведи через ВСЕ точки, не отрывая палец! Линия не должна пересекаться!' : 'Проведи через ВСЕ точки, не отрывая палец от экрана!', hint: r >= 2 ? 'Сначала глазами придумай маршрут без перекрёстков — обычно надо идти по кругу!' : 'Начни с крайней точки и веди палец плавно от точки к точке. Оторвёшь — начнёшь заново!' }),
   appliances: r => ({ p: { boxes: [4, 5, 6][r], remoteIn: ['floor', 'box', 'box'][r], fake: r >= 2, needBtn: r >= 1 }, task: 'Включи ВСЁ в комнате: свет 💡, телевизор 📺 и пылесос 🧹!', hint: ['Розетка одна, а приборов два! В одном из ящиков лежит ПЕРЕХОДНИК-тройник 🔌 — с ним места хватит всем. А свет включается выключателем на стене!', 'Переходник и пульт прячутся в ящиках! Помни: сначала воткни телевизор в розетку, ПОТОМ неси пульт — без электричества пульт не работает. И кнопку пылесоса не забудь!', 'Один из пультов — ИГРУШКА 🧸, настоящий тёмный! Переходник в ящике, свет — выключателем, телевизору сначала электричество, пылесосу — кнопку!'][r] }),
+  /* 🌈 шесть ступеней радуги — от «одного цвета не хватает» до «дуги пустые и без подсказок» */
+  raduga: r => ({ p: {
+      пусто: [['green'],
+              ['orange', 'purple'],
+              ['orange', 'green', 'purple'],
+              ['red', 'orange', 'yellow', 'green', 'blue', 'purple'],
+              ['red', 'orange', 'yellow', 'green', 'blue', 'purple'],
+              ['red', 'orange', 'yellow', 'green', 'blue', 'purple']][r],
+      ловушка: r >= 4, безПодписей: r >= 5 },
+    task: [ 'Собери радугу! Одного цвета не хватает 🌈',
+            'Собери радугу! Не хватает двух цветов 🌈',
+            'Собери радугу! Трёх цветов нет — а шарика всего три 🌈',
+            'Радуга пустая! Собери её ВСЮ из трёх шариков 🌈',
+            'Собери всю радугу. Осторожно: не все цвета дружат! 🌈',
+            'Собери всю радугу по памяти — подсказок не будет 🌈' ][r],
+    hint: [ 'Жёлтый и синий очень дружат. Перетащи один на другой!',
+            'Красный с жёлтым дают оранжевый, красный с синим — фиолетовый.',
+            'Три шарика дают три новых цвета: К+Ж=оранжевый, Ж+С=зелёный, К+С=фиолетовый. Вместе — шесть, вся радуга!',
+            'Свои три шарика тоже кладутся на дуги! Красный — самая большая дуга, фиолетовый — самая маленькая.',
+            'Смешивать можно только ДВА чистых цвета. Если сунуть третий — выйдет бурая клякса.',
+            'Порядок радуги сверху вниз: красный, оранжевый, жёлтый, зелёный, синий, фиолетовый.' ][r] }),
   diffs: r => ({ p: { k: [3, 4, 5, 6][r] }, task: 'Найди ' + [3, 4, 5, 6][r] + ' отличий между картинками! 3 ошибки — красная лампа 🔴', hint: 'Сравнивай по кусочкам: солнце, облако, птичка, крыша, дымоход, окно, дверь, дерево, кот, цветок. Что-то точно не совпадает!' }),
 };
 const RR = ['wires', 'icecream', 'tvroom', 'bignum', 'vacuum', 'pipes', 'memory', 'onestroke', 'oddone', 'cats', 'magnet', 'count', 'balance', 'mazefinger', 'sleepy', 'darkroom'];
@@ -1756,6 +1895,30 @@ const EXTRA_PLAN = [
   ['appliances', 2], ['diffs', 3],
 ];
 EXTRA_PLAN.forEach(([t, r]) => { const s = GEN[t](r); s.t = t; baseList.push(s); });
+/* 🌈 РАДУГА ПО ВСЕЙ ИГРЕ (просьба Марка 19.09.2026: «распредели этот уровень по всей
+   игре, чтобы он не был таким одним»). Шесть ступеней встают через равные промежутки.
+   ⚠️ Вставка в СЕРЕДИНУ сдвигает номера уровней, а прогресс хранится по номерам —
+   поэтому ниже отметки о пройденном переносятся вместе со сдвигом. */
+const РАДУГА_МЕСТА = [13, 39, 65, 91, 117, 143];
+РАДУГА_МЕСТА.forEach((место, k) => {
+  const s2 = GEN.raduga(k); s2.t = 'raduga';
+  baseList.splice(Math.min(место + k, baseList.length), 0, s2);
+});
+(function перенестиПрогресс() {
+  try {
+    if (S.радуга19) return;                       // переносим ровно один раз
+    const было = S.passed || {}, стало = {};
+    for (const к in было) {
+      if (!было[к]) continue;
+      const i = +к; if (!isFinite(i)) continue;
+      /* ⚠️ сдвиг считаем по МЕСТУ вставки в старой нумерации (м), а не по конечному
+         индексу (м+k) — иначе часть новых радуг помечалась как уже пройденная. */
+      const сдвиг = РАДУГА_МЕСТА.filter(м => м <= i).length;
+      стало[i + сдвиг] = true;
+    }
+    S.passed = стало; S.радуга19 = true; save();
+  } catch (e) {}
+})();
 baseList.forEach((s, i) => LEVELS.push({ t: s.t, task: s.task, hint: s.hint, p: s.p || {}, seed: i * 977 + 13 }));
 
 // секрет уровня-прикола: зелёная лампочка в шапке зажигается сама!
@@ -3625,7 +3788,7 @@ window.__dbg = {
 <!-- /🔊 АУДИОСУБТИТРЫ ПЛАНЕТЫ ИГР -->
 
 
-<script>window.__APP_VER = "a70b931e3c";
+<script>window.__APP_VER = "e1aede6a1d";
 /* scoped PWA updater: the installed offline copy stays until a verified replacement activates. */
 (function () {
   var scope = new URL('./', location.href).href;
